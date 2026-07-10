@@ -18,10 +18,21 @@
     "dist:linux": "pnpm transpile:electron && pnpm build && electron-builder --linux --x64"
   },
   "dependencies": {
+    "@effect/schema": "^0.75.5",
+    "@gorhill/ubo-core": "^0.1.30",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "effect": "^3.21.4",
+    "geist": "^1.7.2",
+    "lucide-react": "^1.23.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "react-rnd": "^10.5.3",
+    "tailwind-merge": "^3.6.0",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -31,6 +42,7 @@
     "electron-builder": "^26.15.3",
     "npm-run-all2": "^9.0.2",
     "oxlint": "^1.71.0",
+    "tailwindcss": "^4.3.2",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
   }
