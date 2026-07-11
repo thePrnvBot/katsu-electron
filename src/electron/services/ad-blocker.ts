@@ -1,47 +1,44 @@
-import * as Effect from "effect/Effect";
+import fs from "node:fs/promises";
+import path from "node:path";
+
 import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { app } from "electron";
-import path from "path";
-import fs from "fs/promises";
 
 const FILTER_LISTS = [
   {
-    name: "ublock-filters",
     file: "ublock-filters.txt",
+    name: "ublock-filters",
   },
   {
-    name: "ublock-privacy",
     file: "ublock-privacy.txt",
+    name: "ublock-privacy",
   },
   {
-    name: "ublock-unbreak",
     file: "ublock-unbreak.txt",
+    name: "ublock-unbreak",
   },
   {
-    name: "easylist",
     file: "easylist.txt",
+    name: "easylist",
   },
   {
-    name: "easyprivacy",
     file: "easyprivacy.txt",
+    name: "easyprivacy",
   },
 ];
 
 const TYPE_MAP: Record<string, string> = {
+  cspReport: "csp_report",
   mainFrame: "main_frame",
   subFrame: "sub_frame",
-  xhr: "xmlhttprequest",
-  cspReport: "csp_report",
   webSocket: "websocket",
+  xhr: "xmlhttprequest",
 };
 
 const CACHE_FILE = path.join(app.getPath("userData"), "adblock-cache.json");
-const FILTERS_DIR = path.join(
-  app.getAppPath(),
-  "dist-electron",
-  "filters"
-);
+const FILTERS_DIR = path.join(app.getAppPath(), "dist-electron", "filters");
 
 export interface AdBlocker {
   readonly init: Effect.Effect<void, Error>;
@@ -51,26 +48,26 @@ export interface AdBlocker {
     type: string;
     method: string;
   }) => Effect.Effect<boolean>;
-  readonly getBlockedCount: Effect.Effect<number>;
-  readonly resetBlockedCount: Effect.Effect<void>;
+  readonly getBlockedCountForOrigin: (origin: string) => Effect.Effect<number>;
+  readonly resetBlockedCountForOrigin: (origin: string) => Effect.Effect<void>;
 }
 
 export const AdBlocker = Context.GenericTag<AdBlocker>("AdBlocker");
 
 let snfe: {
-  matchRequest(details: {
+  matchRequest: (details: {
     originURL: string;
     url: string;
     type: string;
     method: string;
-  }): number;
-  serialize(): Promise<string>;
-  deserialize(selfie: string): Promise<void>;
-  useLists(lists: Array<{ name: string; raw: string }>): Promise<void>;
+  }) => number;
+  serialize: () => Promise<string>;
+  deserialize: (selfie: string) => Promise<void>;
+  useLists: (lists: { name: string; raw: string }[]) => Promise<void>;
 } | null = null;
-let blockedCount = 0;
+const perOriginCounts = new Map<string, number>();
 
-async function loadFromCache(): Promise<string | null> {
+const loadFromCache = async (): Promise<string | null> => {
   try {
     const data = await fs.readFile(CACHE_FILE, "utf-8");
     const parsed = JSON.parse(data);
@@ -81,40 +78,42 @@ async function loadFromCache(): Promise<string | null> {
   } catch {
     return null;
   }
-}
+};
 
-async function saveToCache(selfie: string): Promise<void> {
+const saveToCache = async (selfie: string): Promise<void> => {
   try {
     await fs.writeFile(
       CACHE_FILE,
-      JSON.stringify({ version: 1, selfie }),
+      JSON.stringify({ selfie, version: 1 }),
       "utf-8"
     );
   } catch {
     // non-critical
   }
-}
+};
 
-async function loadBundledLists(): Promise<
-  Array<{ name: string; raw: string }>
-> {
-  const results: Array<{ name: string; raw: string }> = [];
+const loadBundledLists = async (): Promise<{ name: string; raw: string }[]> => {
+  const results = await Promise.all(
+    FILTER_LISTS.map(async (list) => {
+      try {
+        const filePath = path.join(FILTERS_DIR, list.file);
+        const raw = await fs.readFile(filePath, "utf-8");
+        return { name: list.name, raw };
+      } catch {
+        return null;
+      }
+    })
+  );
 
-  for (const list of FILTER_LISTS) {
-    try {
-      const filePath = path.join(FILTERS_DIR, list.file);
-      const raw = await fs.readFile(filePath, "utf-8");
-      results.push({ name: list.name, raw });
-    } catch {
-      // skip missing bundled list
-    }
-  }
-
-  return results;
-}
+  return results.filter((r): r is { name: string; raw: string } => r !== null);
+};
 
 export const AdBlockerLive = Layer.succeed(AdBlocker, {
+  getBlockedCountForOrigin: (origin) =>
+    Effect.sync(() => perOriginCounts.get(origin) ?? 0),
+
   init: Effect.tryPromise({
+    catch: () => new Error("Failed to initialize ad blocker"),
     try: async () => {
       const { StaticNetFilteringEngine } = await import("@gorhill/ubo-core");
       snfe = await StaticNetFilteringEngine.create();
@@ -132,31 +131,34 @@ export const AdBlockerLive = Layer.succeed(AdBlocker, {
         await saveToCache(selfie);
       }
     },
-    catch: () => new Error("Failed to initialize ad blocker"),
   }),
 
   matchRequest: (details) =>
     Effect.sync(() => {
-      if (!snfe) return false;
+      if (!snfe) {
+        return false;
+      }
       try {
         const mappedType = TYPE_MAP[details.type] || details.type;
         const blocked =
           snfe.matchRequest({
-            originURL: details.originURL,
-            url: details.url,
-            type: mappedType,
             method: details.method,
+            originURL: details.originURL,
+            type: mappedType,
+            url: details.url,
           }) !== 0;
-        if (blocked) blockedCount++;
+        if (blocked) {
+          const origin = details.originURL;
+          perOriginCounts.set(origin, (perOriginCounts.get(origin) ?? 0) + 1);
+        }
         return blocked;
       } catch {
         return false;
       }
     }),
 
-  getBlockedCount: Effect.sync(() => blockedCount),
-
-  resetBlockedCount: Effect.sync(() => {
-    blockedCount = 0;
-  }),
+  resetBlockedCountForOrigin: (origin) =>
+    Effect.sync(() => {
+      perOriginCounts.delete(origin);
+    }),
 });

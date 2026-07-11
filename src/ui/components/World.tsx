@@ -1,12 +1,13 @@
 import { useCallback, useRef, useState } from "react";
-import { useStore } from "../store/windowStore";
+
+import { useStore } from "../store/window-store";
 
 interface WorldProps {
   children: React.ReactNode;
   onFileDrop: (files: File[]) => void;
 }
 
-export function World({ children, onFileDrop }: WorldProps) {
+export const World = ({ children, onFileDrop }: WorldProps) => {
   const camera = useStore((s) => s.camera);
   const grid = useStore((s) => s.grid);
   const [dragOver, setDragOver] = useState(false);
@@ -17,7 +18,7 @@ export function World({ children, onFileDrop }: WorldProps) {
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current++;
+    dragCounter.current += 1;
     setDragOver(true);
   }, []);
 
@@ -27,8 +28,10 @@ export function World({ children, onFileDrop }: WorldProps) {
   }, []);
 
   const handleDragLeave = useCallback((_e: React.DragEvent) => {
-    dragCounter.current--;
-    if (dragCounter.current === 0) setDragOver(false);
+    dragCounter.current -= 1;
+    if (dragCounter.current === 0) {
+      setDragOver(false);
+    }
   }, []);
 
   const handleDrop = useCallback(
@@ -36,8 +39,10 @@ export function World({ children, onFileDrop }: WorldProps) {
       e.preventDefault();
       dragCounter.current = 0;
       setDragOver(false);
-      const files = Array.from(e.dataTransfer.files);
-      if (files.length > 0) onFileDrop(files);
+      const files = [...e.dataTransfer.files];
+      if (files.length > 0) {
+        onFileDrop(files);
+      }
     },
     [onFileDrop]
   );
@@ -61,11 +66,11 @@ export function World({ children, onFileDrop }: WorldProps) {
       <div
         className="absolute left-0"
         style={{
-          top: 32,
-          width: worldW,
           height: worldH,
+          top: 32,
           transform: `translate3d(${-camera.x}px, ${-camera.y}px, 0)`,
           transformOrigin: "0 0",
+          width: worldW,
         }}
       >
         <svg
@@ -102,4 +107,4 @@ export function World({ children, onFileDrop }: WorldProps) {
       </div>
     </div>
   );
-}
+};

@@ -1,24 +1,26 @@
-import type { Window } from "../store/windowStore";
+import type { Window } from "../store/window-store";
 
 const DEBOUNCE_MS = 500;
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
-export function debouncedSaveState(windows: Window[]) {
+export const debouncedSaveState = (windows: Window[]) => {
   if (saveTimeout) {
     clearTimeout(saveTimeout);
   }
 
-  saveTimeout = setTimeout(() => {
+  saveTimeout = setTimeout(async () => {
     const metadata = windows.map((w) => ({
+      bounds: { height: w.h, width: w.w, x: w.x, y: w.y },
       id: w.id,
-      url: w.url,
-      bounds: { x: w.x, y: w.y, width: w.w, height: w.h },
-      zIndex: w.z ?? 1,
       title: w.fileName,
+      url: w.url,
+      zIndex: w.z ?? 1,
     }));
 
-    window.electronAPI.saveState(metadata).catch((err: unknown) => {
-      console.error("Failed to save state:", err);
-    });
+    try {
+      await window.electronAPI.saveState(metadata);
+    } catch (error: unknown) {
+      console.error("Failed to save state:", error);
+    }
   }, DEBOUNCE_MS);
-}
+};

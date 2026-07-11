@@ -3,86 +3,103 @@ import { contextBridge, ipcRenderer } from "electron";
 let webviewPreloadPath = "";
 
 ipcRenderer.once("config", (_event, config: { webviewPreloadPath: string }) => {
-  webviewPreloadPath = config.webviewPreloadPath;
+  ({ webviewPreloadPath } = config);
+});
+
+let _blockedCountHandler:
+  | ((data: { count: number; origin: string }) => void)
+  | null = null;
+ipcRenderer.on("adblock:count", (_event, data) => {
+  _blockedCountHandler?.(data);
+});
+
+let _eventHandler: ((event: unknown) => void) | null = null;
+ipcRenderer.on("katsu:event", (_event, data) => {
+  _eventHandler?.(data);
+});
+
+let _permissionRequestHandler:
+  | ((request: {
+      id: string;
+      permission: string;
+      origin: string;
+      message: string;
+    }) => void)
+  | null = null;
+ipcRenderer.on("permission:request", (_event, request) => {
+  _permissionRequestHandler?.(request);
+});
+
+let _requestSaveHandler: (() => void) | null = null;
+ipcRenderer.on("state:requestSave", () => {
+  _requestSaveHandler?.();
+});
+
+let _stateLoadedData: unknown[] | null = null;
+let _stateLoadedHandler: ((windows: unknown[]) => void) | null = null;
+ipcRenderer.once("state:loaded", (_event, windows) => {
+  if (_stateLoadedHandler) {
+    _stateLoadedHandler(windows);
+  } else {
+    _stateLoadedData = windows;
+  }
 });
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  sendCommand: async (command: unknown) => {
-    return ipcRenderer.invoke("katsu:command", command);
-  },
+  getWebviewPreloadPath: () => webviewPreloadPath,
 
-  openFile: async () => {
-    return ipcRenderer.invoke("dialog:openFile");
-  },
-
-  onStateLoaded: (callback: (windows: unknown[]) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, windows: unknown[]) =>
-      callback(windows);
-    ipcRenderer.once("state:loaded", handler);
-    return () => ipcRenderer.removeListener("state:loaded", handler);
-  },
-
-  onEvent: (callback: (event: unknown) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, data: unknown) =>
-      callback(data);
-    ipcRenderer.on("katsu:event", handler);
-    return () => ipcRenderer.removeListener("katsu:event", handler);
-  },
+  openFile: () => ipcRenderer.invoke("dialog:openFile"),
 
   platform: process.platform,
 
-  getWebviewPreloadPath: () => webviewPreloadPath,
+  respondToPermission: (permissionId: string, granted: boolean) =>
+    ipcRenderer.invoke(`permission:response:${permissionId}`, granted),
 
-  onBlockedCount: (callback: (count: number) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, count: number) =>
-      callback(count);
-    ipcRenderer.on("adblock:count", handler);
-    return () => ipcRenderer.removeListener("adblock:count", handler);
+  saveState: (windows: unknown[]) =>
+    ipcRenderer.invoke("katsu:command", {
+      payload: { windows },
+      type: "state:save",
+    }),
+
+  saveStateResponse: (windows: unknown[]) =>
+    ipcRenderer.invoke("state:saveResponse", windows),
+
+  saveTempFile: (name: string, buffer: ArrayBuffer) =>
+    ipcRenderer.invoke("dialog:saveTempFile", { buffer, name }),
+
+  sendCommand: (command: unknown) =>
+    ipcRenderer.invoke("katsu:command", command),
+
+  setBlockedCountHandler: (
+    handler: (data: { count: number; origin: string }) => void
+  ) => {
+    _blockedCountHandler = handler;
   },
 
-  onPermissionRequest: (
-    callback: (request: {
+  setEventHandler: (handler: (event: unknown) => void) => {
+    _eventHandler = handler;
+  },
+
+  setPermissionRequestHandler: (
+    handler: (request: {
       id: string;
       permission: string;
       origin: string;
       message: string;
     }) => void
   ) => {
-    const handler = (
-      _event: Electron.IpcRendererEvent,
-      request: {
-        id: string;
-        permission: string;
-        origin: string;
-        message: string;
-      }
-    ) => callback(request);
-    ipcRenderer.on("permission:request", handler);
-    return () => ipcRenderer.removeListener("permission:request", handler);
+    _permissionRequestHandler = handler;
   },
 
-  respondToPermission: async (permissionId: string, granted: boolean) => {
-    return ipcRenderer.invoke(`permission:response:${permissionId}`, granted);
+  setRequestSaveHandler: (handler: () => void) => {
+    _requestSaveHandler = handler;
   },
 
-  saveState: async (windows: unknown[]) => {
-    return ipcRenderer.invoke("katsu:command", {
-      type: "state:save",
-      payload: { windows },
-    });
-  },
-
-  onRequestSave: (callback: () => void) => {
-    const handler = () => callback();
-    ipcRenderer.on("state:requestSave", handler);
-    return () => ipcRenderer.removeListener("state:requestSave", handler);
-  },
-
-  saveStateResponse: async (windows: unknown[]) => {
-    return ipcRenderer.invoke("state:saveResponse", windows);
-  },
-
-  saveTempFile: async (name: string, buffer: ArrayBuffer) => {
-    return ipcRenderer.invoke("dialog:saveTempFile", { name, buffer });
+  setStateLoadedHandler: (handler: (windows: unknown[]) => void) => {
+    _stateLoadedHandler = handler;
+    if (_stateLoadedData) {
+      handler(_stateLoadedData);
+      _stateLoadedData = null;
+    }
   },
 });

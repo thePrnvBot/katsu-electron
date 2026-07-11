@@ -1,9 +1,9 @@
 {
   "name": "katsu-electron",
-  "private": true,
   "version": "0.0.0",
-  "type": "module",
+  "private": true,
   "author": "thePrnvBot",
+  "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "run-p dev:react dev:electron",
@@ -15,7 +15,10 @@
     "transpile:electron": "tsc --project src/electron/tsconfig.json",
     "dist:mac": "pnpm transpile:electron && pnpm build && electron-builder --mac --arm64",
     "dist:win": "pnpm transpile:electron && pnpm build && electron-builder --win --x64",
-    "dist:linux": "pnpm transpile:electron && pnpm build && electron-builder --linux --x64"
+    "dist:linux": "pnpm transpile:electron && pnpm build && electron-builder --linux --x64",
+    "check": "ultracite check",
+    "fix": "ultracite fix",
+    "prepare": "husky"
   },
   "dependencies": {
     "@effect/schema": "^0.75.5",
@@ -40,10 +43,13 @@
     "cross-env": "^10.1.0",
     "electron": "^43.0.0",
     "electron-builder": "^26.15.3",
+    "husky": "^9.1.7",
     "npm-run-all2": "^9.0.2",
-    "oxlint": "^1.71.0",
+    "oxfmt": "^0.58.0",
+    "oxlint": "^1.73.0",
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.2",
+    "ultracite": "7.9.3",
     "vite": "^8.1.1"
   }
 }

@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import { useStore } from "../store/windowStore";
+
+import { useStore } from "../store/window-store";
 
 const EPSILON = 0.01;
 
-export function CameraAnimator() {
+export const CameraAnimator = () => {
   useEffect(() => {
     let raf = 0;
     let running = false;
@@ -48,4 +49,4 @@ export function CameraAnimator() {
   }, []);
 
   return null;
-}
+};

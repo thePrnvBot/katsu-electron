@@ -1,52 +1,52 @@
 import * as Schema from "effect/Schema";
 
 export const BoundsSchema = Schema.Struct({
+  height: Schema.Number.pipe(Schema.positive()),
+  width: Schema.Number.pipe(Schema.positive()),
   x: Schema.Number,
   y: Schema.Number,
-  width: Schema.Number.pipe(Schema.positive()),
-  height: Schema.Number.pipe(Schema.positive()),
 });
 
 export const WindowMetadataSchema = Schema.Struct({
-  id: Schema.String,
-  url: Schema.String,
   bounds: BoundsSchema,
-  zIndex: Schema.Number.pipe(Schema.int()),
+  id: Schema.String,
   title: Schema.optional(Schema.String),
+  url: Schema.String,
+  zIndex: Schema.Number.pipe(Schema.int()),
 });
 
 export const DialogOpenFileCommand = Schema.Struct({
-  type: Schema.Literal("dialog:openFile"),
   payload: Schema.Struct({}),
+  type: Schema.Literal("dialog:openFile"),
 });
 
 export const StateLoadCommand = Schema.Struct({
-  type: Schema.Literal("state:load"),
   payload: Schema.Struct({}),
+  type: Schema.Literal("state:load"),
 });
 
 export const StateSaveCommand = Schema.Struct({
-  type: Schema.Literal("state:save"),
   payload: Schema.Struct({
     windows: Schema.Array(WindowMetadataSchema),
   }),
+  type: Schema.Literal("state:save"),
 });
 
 export const WindowControlCommand = Schema.Struct({
-  type: Schema.Literal("window:control"),
   payload: Schema.Union(
     Schema.Literal("minimize"),
     Schema.Literal("maximize"),
     Schema.Literal("close")
   ),
+  type: Schema.Literal("window:control"),
 });
 
 export const PermissionRespondCommand = Schema.Struct({
-  type: Schema.Literal("permission:respond"),
   payload: Schema.Struct({
-    requestId: Schema.String,
     granted: Schema.Boolean,
+    requestId: Schema.String,
   }),
+  type: Schema.Literal("permission:respond"),
 });
 
 export const IPCCommand = Schema.Union(
@@ -60,11 +60,11 @@ export const IPCCommand = Schema.Union(
 export type IPCCommand = typeof IPCCommand.Type;
 
 export const IPCResponse = Schema.Union(
-  Schema.Struct({ success: Schema.Literal(true), data: Schema.Unknown }),
+  Schema.Struct({ data: Schema.Unknown, success: Schema.Literal(true) }),
   Schema.Struct({
-    success: Schema.Literal(false),
-    error: Schema.String,
     details: Schema.optional(Schema.Unknown),
+    error: Schema.String,
+    success: Schema.Literal(false),
   })
 );
 

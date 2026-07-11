@@ -1,55 +1,112 @@
+import * as Effect from "effect/Effect";
 import { useEffect, useRef, useState } from "react";
-import { useStore } from "./store/windowStore";
-import { World } from "./components/World";
-import { Window } from "./components/Window";
-import { Minimap } from "./components/Minimap";
-import { SearchBar } from "./components/SearchBar";
-import { TitleBar } from "./components/TitleBar";
-import { CommandMenu } from "./components/CommandMenu";
-import { CameraAnimator } from "./components/CameraAnimator";
-import { createFilePreview } from "./utils/filePreview";
-import { usePermissions } from "./hooks/usePermissions";
 
-const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "ico"]);
+import { CameraAnimator } from "./components/camera-animator";
+import { CommandMenu } from "./components/command-menu";
+import { Minimap } from "./components/minimap";
+import { PermissionDialog } from "./components/permission-dialog";
+import { SearchBar } from "./components/search-bar";
+import { TitleBar } from "./components/title-bar";
+import { Window } from "./components/window";
+import { World } from "./components/world";
+import { useStore } from "./store/window-store";
+import { createFilePreview } from "./utils/file-preview";
+
+const IMAGE_EXTENSIONS = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "bmp",
+  "svg",
+  "ico",
+]);
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "ogg", "mov", "mkv", "avi"]);
 const TITLEBAR_H = 36;
 const WINDOW_BORDER = 4;
 
-function getMediaDimensions(url: string, ext: string): Promise<{ w: number; h: number }> {
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve({ w: 0, h: 0 }), 3000);
+const normalizeUrl = (value: string) => {
+  if (!value) {
+    return null;
+  }
+  if (value.startsWith("file://")) {
+    return value;
+  }
+  if (value.startsWith("katsu://")) {
+    return value;
+  }
+  if (value.startsWith("http://")) {
+    return `https://${value.slice("http://".length)}`;
+  }
+  if (value.startsWith("https://")) {
+    return value;
+  }
+  return `https://${value}`;
+};
 
-    if (IMAGE_EXTENSIONS.has(ext)) {
-      const img = new Image();
-      img.onload = () => {
-        clearTimeout(timeout);
-        resolve({ w: img.naturalWidth, h: img.naturalHeight });
+const getMediaDimensions = (
+  url: string,
+  ext: string
+): Promise<{ w: number; h: number }> =>
+  Effect.runPromise(
+    Effect.async<{ w: number; h: number }, never>((resolve) => {
+      let resolved = false;
+      const safeResolve = (value: { w: number; h: number }) => {
+        if (!resolved) {
+          resolved = true;
+          resolve(Effect.succeed(value));
+        }
       };
-      img.onerror = () => {
+
+      const timeout = setTimeout(() => safeResolve({ h: 0, w: 0 }), 3000);
+
+      if (IMAGE_EXTENSIONS.has(ext)) {
+        const img = new Image();
+        img.addEventListener(
+          "load",
+          () => {
+            clearTimeout(timeout);
+            safeResolve({ h: img.naturalHeight, w: img.naturalWidth });
+          },
+          { once: true }
+        );
+        img.addEventListener(
+          "error",
+          () => {
+            clearTimeout(timeout);
+            safeResolve({ h: 0, w: 0 });
+          },
+          { once: true }
+        );
+        img.src = url;
+      } else if (VIDEO_EXTENSIONS.has(ext)) {
+        const video = document.createElement("video");
+        video.addEventListener(
+          "loadedmetadata",
+          () => {
+            clearTimeout(timeout);
+            safeResolve({ h: video.videoHeight, w: video.videoWidth });
+          },
+          { once: true }
+        );
+        video.addEventListener(
+          "error",
+          () => {
+            clearTimeout(timeout);
+            safeResolve({ h: 0, w: 0 });
+          },
+          { once: true }
+        );
+        video.src = url;
+      } else {
         clearTimeout(timeout);
-        resolve({ w: 0, h: 0 });
-      };
-      img.src = url;
-    } else if (VIDEO_EXTENSIONS.has(ext)) {
-      const video = document.createElement("video");
-      video.onloadedmetadata = () => {
-        clearTimeout(timeout);
-        resolve({ w: video.videoWidth, h: video.videoHeight });
-      };
-      video.onerror = () => {
-        clearTimeout(timeout);
-        resolve({ w: 0, h: 0 });
-      };
-      video.src = url;
-    } else {
-      clearTimeout(timeout);
-      resolve({ w: 0, h: 0 });
-    }
-  });
-}
+        safeResolve({ h: 0, w: 0 });
+      }
+    })
+  );
 
 export default function App() {
-  usePermissions();
   const moveCell = useStore((s) => s.moveCell);
   const currentCell = useStore((s) => s.currentCell);
   const grid = useStore((s) => s.grid);
@@ -61,47 +118,47 @@ export default function App() {
 
   // Load persisted state on mount
   useEffect(() => {
-    const cleanup = window.electronAPI.onStateLoaded((savedWindows: unknown[]) => {
+    window.electronAPI.setStateLoadedHandler((savedWindows: unknown[]) => {
       if (Array.isArray(savedWindows)) {
         for (const w of savedWindows) {
           const win = w as Record<string, unknown>;
           const bounds = win.bounds as Record<string, number> | undefined;
           addWindow({
+            fileName: win.title as string | undefined,
+            h: bounds?.height ?? 400,
             id: win.id as string,
+            url: win.url as string,
+            w: bounds?.width ?? 600,
             x: bounds?.x ?? 100,
             y: bounds?.y ?? 100,
-            w: bounds?.width ?? 600,
-            h: bounds?.height ?? 400,
-            url: win.url as string,
-            fileName: win.title as string | undefined,
             z: win.zIndex as number | undefined,
           });
         }
       }
     });
-    return cleanup;
   }, [addWindow]);
 
   // Save state when main process requests it (before quit)
   useEffect(() => {
-    const cleanup = window.electronAPI.onRequestSave(() => {
+    window.electronAPI.setRequestSaveHandler(() => {
       const currentWindows = useStore.getState().windows;
       const metadata = currentWindows.map((w) => ({
+        bounds: { height: w.h, width: w.w, x: w.x, y: w.y },
         id: w.id,
-        url: w.url,
-        bounds: { x: w.x, y: w.y, width: w.w, height: w.h },
-        zIndex: w.z ?? 1,
         title: w.fileName,
+        url: w.url,
+        zIndex: w.z ?? 1,
       }));
       window.electronAPI.saveStateResponse(metadata);
     });
-    return cleanup;
   }, []);
 
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
       const target = e.target as HTMLElement;
-      if (target?.tagName === "IFRAME" || target?.tagName === "WEBVIEW") return;
+      if (target?.tagName === "IFRAME" || target?.tagName === "WEBVIEW") {
+        return;
+      }
 
       const threshold = 80;
       wheelAccum.current.x += e.deltaX;
@@ -123,51 +180,56 @@ export default function App() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return;
-      if ((e.target as HTMLElement).closest("[cmdk-root]")) return;
-      if (e.key === "ArrowRight") moveCell(1, 0);
-      if (e.key === "ArrowLeft") moveCell(-1, 0);
-      if (e.key === "ArrowDown") moveCell(0, 1);
-      if (e.key === "ArrowUp") moveCell(0, -1);
+      if (e.target instanceof HTMLInputElement) {
+        return;
+      }
+      if ((e.target as HTMLElement).closest("[cmdk-root]")) {
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        moveCell(1, 0);
+      }
+      if (e.key === "ArrowLeft") {
+        moveCell(-1, 0);
+      }
+      if (e.key === "ArrowDown") {
+        moveCell(0, 1);
+      }
+      if (e.key === "ArrowUp") {
+        moveCell(0, -1);
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [moveCell]);
 
-  const normalizeUrl = (value: string) => {
-    if (!value) return null;
-    if (value.startsWith("file://")) return value;
-    if (value.startsWith("katsu://")) return value;
-    if (value.startsWith("http://"))
-      return `https://${value.slice("http://".length)}`;
-    if (value.startsWith("https://")) return value;
-    return `https://${value}`;
-  };
-
   const openWindow = (cleanUrl: string) => {
     const newWindowId = crypto.randomUUID();
     addWindow({
+      h: 400,
       id: newWindowId,
+      url: cleanUrl,
+      w: 600,
       x: currentCell.x * grid.cellWidth + 100 + Math.random() * 50,
       y: currentCell.y * grid.cellHeight + 100 + Math.random() * 50,
-      w: 600,
-      h: 400,
-      url: cleanUrl,
     });
     setActiveWindow(newWindowId);
   };
 
   const openSite = () => {
     const cleanUrl = normalizeUrl(urlField);
-    if (!cleanUrl) return;
+    if (!cleanUrl) {
+      return;
+    }
     openWindow(cleanUrl);
     setUrlField("");
   };
 
   const handleFileOpen = async (files: File[]) => {
-    for (const file of files) {
-      const { url, fileName, nativeWidth, nativeHeight } =
-        await createFilePreview(file);
+    const previews = await Promise.all(files.map(createFilePreview));
+
+    for (const preview of previews) {
+      const { url, fileName, nativeWidth, nativeHeight } = preview;
       const newWindowId = crypto.randomUUID();
 
       const contentMaxW = grid.cellWidth * 0.9 - WINDOW_BORDER;
@@ -176,7 +238,11 @@ export default function App() {
       let h = nativeHeight ?? 500;
 
       if (nativeWidth && nativeHeight) {
-        const scale = Math.min(contentMaxW / nativeWidth, contentMaxH / nativeHeight, 1);
+        const scale = Math.min(
+          contentMaxW / nativeWidth,
+          contentMaxH / nativeHeight,
+          1
+        );
         w = Math.round(nativeWidth * scale) + WINDOW_BORDER;
         h = Math.round(nativeHeight * scale) + WINDOW_BORDER + TITLEBAR_H;
       } else {
@@ -185,13 +251,13 @@ export default function App() {
       }
 
       addWindow({
+        fileName,
+        h,
         id: newWindowId,
+        url,
+        w,
         x: currentCell.x * grid.cellWidth + (grid.cellWidth - w) / 2,
         y: currentCell.y * grid.cellHeight + (grid.cellHeight - h) / 2,
-        w,
-        h,
-        url,
-        fileName,
       });
       setActiveWindow(newWindowId);
     }
@@ -200,18 +266,31 @@ export default function App() {
   const handleOpenFileDialog = async () => {
     const result = await window.electronAPI.openFile();
     if (!result.canceled && result.filePaths.length > 0) {
-      for (const filePath of result.filePaths) {
-        const fileName = filePath.split(/[/\\]/).pop() ?? filePath;
-        const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-        const rawUrl = `katsu://preview/${encodeURIComponent(filePath)}?raw`;
-        const { w: nativeW, h: nativeH } = await getMediaDimensions(rawUrl, ext);
+      const fileData = await Promise.all(
+        result.filePaths.map(async (filePath) => {
+          const fileName = filePath.split(/[/\\]/u).pop() ?? filePath;
+          const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+          const rawUrl = `katsu://preview/${encodeURIComponent(filePath)}?raw`;
+          const { w: nativeW, h: nativeH } = await getMediaDimensions(
+            rawUrl,
+            ext
+          );
+          return { ext, fileName, filePath, nativeH, nativeW };
+        })
+      );
+
+      for (const { filePath, fileName, nativeH, nativeW } of fileData) {
         const contentMaxW = grid.cellWidth * 0.9 - WINDOW_BORDER;
         const contentMaxH = grid.cellHeight * 0.9 - WINDOW_BORDER - TITLEBAR_H;
         let w = 700;
         let h = 500;
 
         if (nativeW && nativeH) {
-          const scale = Math.min(contentMaxW / nativeW, contentMaxH / nativeH, 1);
+          const scale = Math.min(
+            contentMaxW / nativeW,
+            contentMaxH / nativeH,
+            1
+          );
           w = Math.round(nativeW * scale) + WINDOW_BORDER;
           h = Math.round(nativeH * scale) + WINDOW_BORDER + TITLEBAR_H;
         } else {
@@ -221,13 +300,13 @@ export default function App() {
 
         const newWindowId = crypto.randomUUID();
         addWindow({
+          fileName,
+          h,
           id: newWindowId,
+          url: `katsu://preview/${encodeURIComponent(filePath)}`,
+          w,
           x: currentCell.x * grid.cellWidth + (grid.cellWidth - w) / 2,
           y: currentCell.y * grid.cellHeight + (grid.cellHeight - h) / 2,
-          w,
-          h,
-          url: `katsu://preview/${encodeURIComponent(filePath)}`,
-          fileName,
         });
         setActiveWindow(newWindowId);
       }
@@ -251,6 +330,7 @@ export default function App() {
         ))}
       </World>
       <Minimap />
+      <PermissionDialog />
     </div>
   );
 }

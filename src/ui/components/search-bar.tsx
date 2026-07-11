@@ -10,20 +10,24 @@ interface SearchBarProps {
   onOpenFileDialog: () => void;
 }
 
-export function SearchBar({
+export const SearchBar = ({
   url,
   handleChange,
   openSite,
   onOpenFileDialog,
-}: SearchBarProps) {
+}: SearchBarProps) => {
   const [hidden, setHidden] = useState(false);
   const [focused, setFocused] = useState(false);
   const timer = useRef<number | null>(null);
 
   const startHideTimer = useCallback(() => {
-    if (timer.current) clearTimeout(timer.current);
+    if (timer.current) {
+      clearTimeout(timer.current);
+    }
     timer.current = window.setTimeout(() => {
-      if (!focused) setHidden(true);
+      if (!focused) {
+        setHidden(true);
+      }
     }, HIDE_DELAY);
   }, [focused]);
 
@@ -35,7 +39,9 @@ export function SearchBar({
   useEffect(() => {
     startHideTimer();
     return () => {
-      if (timer.current) window.clearTimeout(timer.current);
+      if (timer.current) {
+        window.clearTimeout(timer.current);
+      }
     };
   }, [startHideTimer]);
 
@@ -47,9 +53,7 @@ export function SearchBar({
         onMouseMove={show}
         onMouseEnter={show}
         className={`flex items-center gap-2 rounded-full border border-white/10 bg-[#222] p-2 shadow-lg backdrop-blur-sm transition-transform duration-300 ease-in-out ${
-          visible
-            ? "translate-y-2.5"
-            : "-translate-y-full pointer-events-none"
+          visible ? "translate-y-2.5" : "-translate-y-full pointer-events-none"
         }`}
       >
         <span className="px-4 pr-2 text-sm text-white/70">Katsu</span>
@@ -70,13 +74,16 @@ export function SearchBar({
             startHideTimer();
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") openSite();
+            if (e.key === "Enter") {
+              openSite();
+            }
             show();
           }}
           className="h-8 w-65 rounded-full bg-[#333] px-4 text-sm text-[#eee] outline-none focus:ring-2 focus:ring-white/25"
         />
 
         <button
+          type="button"
           onClick={() => {
             onOpenFileDialog();
             show();
@@ -88,6 +95,7 @@ export function SearchBar({
         </button>
 
         <button
+          type="button"
           onClick={() => {
             openSite();
             show();
@@ -106,4 +114,4 @@ export function SearchBar({
       />
     </div>
   );
-}
+};

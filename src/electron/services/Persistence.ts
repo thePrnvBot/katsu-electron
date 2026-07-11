@@ -1,63 +1,64 @@
-import * as Effect from "effect/Effect";
+import fs from "node:fs/promises";
+import path from "node:path";
+
 import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { app } from "electron";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
+
+import { PersistenceError } from "../shared/errors/persistence-error.js";
 import type { WindowMetadata } from "../shared/types.js";
-import { PersistenceError } from "../shared/types.js";
 
 const BoundsSchema = Schema.Struct({
+  height: Schema.Number,
+  width: Schema.Number,
   x: Schema.Number,
   y: Schema.Number,
-  width: Schema.Number,
-  height: Schema.Number,
 });
 
 const WindowMetadataSchema = Schema.Struct({
-  id: Schema.String,
-  url: Schema.String,
   bounds: BoundsSchema,
-  zIndex: Schema.Number,
+  id: Schema.String,
   title: Schema.optional(Schema.String),
+  url: Schema.String,
+  zIndex: Schema.Number,
 });
 
 const WindowsSchema = Schema.Array(WindowMetadataSchema);
 
 export interface Persistence {
   readonly loadState: Effect.Effect<
-    ReadonlyArray<WindowMetadata>,
+    readonly WindowMetadata[],
     PersistenceError
   >;
   readonly saveState: (
-    windows: ReadonlyArray<WindowMetadata>
+    windows: readonly WindowMetadata[]
   ) => Effect.Effect<void, PersistenceError>;
   readonly getStatePath: Effect.Effect<string>;
 }
 
 export const Persistence = Context.GenericTag<Persistence>("Persistence");
 
-function getStateFilePath(): string {
-  return path.join(app.getPath("userData"), "windows.json");
-}
+const getStateFilePath = (): string =>
+  path.join(app.getPath("userData"), "windows.json");
 
 export const PersistenceLive = Layer.succeed(Persistence, {
   getStatePath: Effect.sync(getStateFilePath),
 
-  loadState: Effect.gen(function* () {
+  loadState: Effect.gen(function* loadState() {
     const filePath = getStateFilePath();
     try {
       const content = yield* Effect.tryPromise({
-        try: () => fs.readFile(filePath, "utf-8"),
         catch: (err) => new PersistenceError("ReadFailed", err),
+        try: () => fs.readFile(filePath, "utf-8"),
       });
       const parsed = yield* Effect.try({
+        catch: (err) => new PersistenceError("ParseFailed", err),
         try: () => {
           const raw = JSON.parse(content);
           return Schema.decodeUnknownSync(WindowsSchema)(raw);
         },
-        catch: (err) => new PersistenceError("ParseFailed", err),
       });
       return parsed;
     } catch {
@@ -65,20 +66,20 @@ export const PersistenceLive = Layer.succeed(Persistence, {
     }
   }),
 
-  saveState: (windows: ReadonlyArray<WindowMetadata>) =>
-    Effect.gen(function* () {
+  saveState: (windows: readonly WindowMetadata[]) =>
+    Effect.gen(function* saveState() {
       const filePath = getStateFilePath();
-      const tmpPath = filePath + ".tmp";
+      const tmpPath = `${filePath}.tmp`;
       const content = JSON.stringify(windows, null, 2);
 
       yield* Effect.tryPromise({
-        try: () => fs.writeFile(tmpPath, content, "utf-8"),
         catch: (err) => new PersistenceError("WriteFailed", err),
+        try: () => fs.writeFile(tmpPath, content, "utf-8"),
       });
 
       yield* Effect.tryPromise({
-        try: () => fs.rename(tmpPath, filePath),
         catch: (err) => new PersistenceError("AtomicRenameFailed", err),
+        try: () => fs.rename(tmpPath, filePath),
       });
     }),
 });

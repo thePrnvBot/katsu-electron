@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useStore } from "../store/windowStore";
+
+import { useStore } from "../store/window-store";
 
 const CELL_SIZE = 14;
 const GAP = 1;
 const HIDE_DELAY = 2500;
 
-export function Minimap() {
+export const Minimap = () => {
   const grid = useStore((s) => s.grid);
   const currentCell = useStore((s) => s.currentCell);
   const moveToCell = useStore((s) => s.moveToCell);
@@ -15,9 +16,13 @@ export function Minimap() {
   const timer = useRef<number | null>(null);
 
   const startHideTimer = useCallback(() => {
-    if (timer.current) clearTimeout(timer.current);
+    if (timer.current) {
+      clearTimeout(timer.current);
+    }
     timer.current = window.setTimeout(() => {
-      if (!hovered) setHidden(true);
+      if (!hovered) {
+        setHidden(true);
+      }
     }, HIDE_DELAY);
   }, [hovered]);
 
@@ -29,7 +34,9 @@ export function Minimap() {
   useEffect(() => {
     startHideTimer();
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).closest("[cmdk-root]")) return;
+      if ((e.target as HTMLElement).closest("[cmdk-root]")) {
+        return;
+      }
       if (
         e.key === "ArrowUp" ||
         e.key === "ArrowDown" ||
@@ -41,7 +48,9 @@ export function Minimap() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
-      if (timer.current) clearTimeout(timer.current);
+      if (timer.current) {
+        clearTimeout(timer.current);
+      }
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [show, startHideTimer]);
@@ -74,32 +83,31 @@ export function Minimap() {
         onMouseLeave={handleMouseLeave}
         onMouseMove={show}
         className={`rounded-lg border border-white/10 bg-[#111] p-2 transition-transform duration-300 ease-in-out ${
-          hidden
-            ? "translate-y-full pointer-events-none"
-            : "-translate-y-4"
+          hidden ? "translate-y-full pointer-events-none" : "-translate-y-4"
         }`}
-        style={{ width: w + 16, height: h + 16 }}
+        style={{ height: h + 16, width: w + 16 }}
       >
-        <div className="relative" style={{ width: w, height: h }}>
+        <div className="relative" style={{ height: h, width: w }}>
           {Array.from({ length: grid.rows }).map((_, row) =>
-            Array.from({ length: grid.cols }).map((_, col) => {
-              const isCurrent =
-                col === currentCell.x && row === currentCell.y;
+            Array.from({ length: grid.cols }).map((_col, col) => {
+              const isCurrent = col === currentCell.x && row === currentCell.y;
               return (
                 <button
+                  type="button"
+                  aria-label={`Cell ${col}, ${row}`}
                   key={`${col}-${row}`}
                   onClick={() => moveToCell(col, row)}
                   className="absolute border-none transition-colors"
                   style={{
-                    left: col * (CELL_SIZE + GAP),
-                    top: row * (CELL_SIZE + GAP),
-                    width: CELL_SIZE,
-                    height: CELL_SIZE,
-                    borderRadius: 2,
                     background: isCurrent
                       ? "rgba(255,255,255,0.5)"
                       : "rgba(255,255,255,0.08)",
+                    borderRadius: 2,
                     cursor: isCurrent ? "default" : "pointer",
+                    height: CELL_SIZE,
+                    left: col * (CELL_SIZE + GAP),
+                    top: row * (CELL_SIZE + GAP),
+                    width: CELL_SIZE,
                   }}
                 />
               );
@@ -109,4 +117,4 @@ export function Minimap() {
       </div>
     </div>
   );
-}
+};

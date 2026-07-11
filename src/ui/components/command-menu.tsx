@@ -1,6 +1,7 @@
 import { Command } from "cmdk";
 import { useEffect, useState } from "react";
-import { useStore } from "../store/windowStore";
+
+import { useStore } from "../store/window-store";
 
 type CommandPages = "root" | "windows" | "layout";
 
@@ -9,29 +10,27 @@ interface SubMenuProps {
   closeAndResetMenu: () => void;
 }
 
-function RootMenu({ navigateToPage }: SubMenuProps) {
-  return (
-    <>
-      <Command.Empty className="px-3 py-2 text-sm text-white/40">
-        No results found.
-      </Command.Empty>
-      <Command.Item
-        onSelect={() => navigateToPage("windows")}
-        className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
-      >
-        Search Windows
-      </Command.Item>
-      <Command.Item
-        onSelect={() => navigateToPage("layout")}
-        className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
-      >
-        Set Window Layout
-      </Command.Item>
-    </>
-  );
-}
+const RootMenu = ({ navigateToPage }: SubMenuProps) => (
+  <>
+    <Command.Empty className="px-3 py-2 text-sm text-white/40">
+      No results found.
+    </Command.Empty>
+    <Command.Item
+      onSelect={() => navigateToPage("windows")}
+      className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
+    >
+      Search Windows
+    </Command.Item>
+    <Command.Item
+      onSelect={() => navigateToPage("layout")}
+      className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
+    >
+      Set Window Layout
+    </Command.Item>
+  </>
+);
 
-function WindowsMenu({ closeAndResetMenu }: SubMenuProps) {
+const WindowsMenu = ({ closeAndResetMenu }: SubMenuProps) => {
   const windows = useStore((s) => s.windows);
   const centerOnWindow = useStore((s) => s.centerOnWindow);
   const setActiveWindow = useStore((s) => s.setActiveWindow);
@@ -59,13 +58,16 @@ function WindowsMenu({ closeAndResetMenu }: SubMenuProps) {
       ))}
     </>
   );
-}
+};
 
-function LayoutMenu({ closeAndResetMenu }: SubMenuProps) {
+const LayoutMenu = ({ closeAndResetMenu }: SubMenuProps) => {
   const activeWindowId = useStore((s) => s.activeWindowId);
   const setWindowLayout = useStore((s) => s.setWindowLayout);
 
-  type LayoutItem = { key: string; label: string };
+  interface LayoutItem {
+    key: string;
+    label: string;
+  }
 
   const LAYOUTS: LayoutItem[] = [
     { key: "left_half", label: "Left Half" },
@@ -113,13 +115,13 @@ function LayoutMenu({ closeAndResetMenu }: SubMenuProps) {
       ))}
     </>
   );
-}
+};
 
-export function CommandMenu() {
+export const CommandMenu = () => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [pages, setPages] = useState<CommandPages[]>(["root"]);
-  const page = pages[pages.length - 1];
+  const page = pages.at(-1);
 
   const navigateToPage = (p: CommandPages) => {
     setSearch("");
@@ -156,7 +158,9 @@ export function CommandMenu() {
       open={open}
       onOpenChange={(isOpen) => {
         setOpen(isOpen);
-        if (!isOpen) resetMenu();
+        if (!isOpen) {
+          resetMenu();
+        }
       }}
       label="Global Command Menu"
       className="fixed top-[20%] left-1/2 z-99999 w-full max-w-lg -translate-x-1/2 rounded-2xl border border-white/10 bg-[#222] p-2 shadow-lg shadow-black/30 backdrop-blur-sm"
@@ -170,6 +174,7 @@ export function CommandMenu() {
       {page !== "root" && (
         <div className="flex items-center gap-2 px-2 pb-2">
           <button
+            type="button"
             onClick={goBackToPreviousPage}
             className="text-xs text-white/40 hover:text-white/70"
           >
@@ -206,4 +211,4 @@ export function CommandMenu() {
       </Command.List>
     </Command.Dialog>
   );
-}
+};

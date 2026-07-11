@@ -1,10 +1,47 @@
+import * as Effect from "effect/Effect";
+
 const WRAP_EXTENSIONS = new Set([
-  "ts", "tsx", "js", "jsx", "json", "md", "css", "html", "htm", "xml",
-  "svg", "yaml", "yml", "toml", "ini", "cfg", "conf", "env",
-  "py", "rb", "go", "rs", "java", "c", "cpp", "h", "hpp",
-  "sh", "bash", "zsh", "fish", "ps1", "bat", "cmd",
-  "sql", "graphql", "gql",
-  "txt", "log", "csv", "tsv",
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "json",
+  "md",
+  "css",
+  "html",
+  "htm",
+  "xml",
+  "svg",
+  "yaml",
+  "yml",
+  "toml",
+  "ini",
+  "cfg",
+  "conf",
+  "env",
+  "py",
+  "rb",
+  "go",
+  "rs",
+  "java",
+  "c",
+  "cpp",
+  "h",
+  "hpp",
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "ps1",
+  "bat",
+  "cmd",
+  "sql",
+  "graphql",
+  "gql",
+  "txt",
+  "log",
+  "csv",
+  "tsv",
 ]);
 
 const WRAP_MIME_PREFIXES = [
@@ -17,21 +54,22 @@ const WRAP_MIME_PREFIXES = [
   "application/toml",
 ];
 
-function shouldWrap(mimeType: string, fileName: string): boolean {
-  if (WRAP_MIME_PREFIXES.some((p) => mimeType.startsWith(p))) return true;
+const shouldWrap = (mimeType: string, fileName: string): boolean => {
+  if (WRAP_MIME_PREFIXES.some((p) => mimeType.startsWith(p))) {
+    return true;
+  }
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
   return WRAP_EXTENSIONS.has(ext);
-}
+};
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+const escapeHtml = (str: string): string =>
+  str
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 
-function getTextWrapHtml(content: string, fileName: string): string {
+const getTextWrapHtml = (content: string, fileName: string): string => {
   const lang = fileName.split(".").pop() ?? "text";
   return `<!DOCTYPE html>
 <html>
@@ -69,10 +107,10 @@ function getTextWrapHtml(content: string, fileName: string): string {
 <pre>${escapeHtml(content)}</pre>
 </body>
 </html>`;
-}
+};
 
-function getDownloadHtml(fileName: string): string {
-  return `<!DOCTYPE html>
+const getDownloadHtml = (fileName: string): string =>
+  `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -102,10 +140,9 @@ function getDownloadHtml(fileName: string): string {
 <div class="hint">Preview not available — download to view</div>
 </body>
 </html>`;
-}
 
-function getImageWrapHtml(dataUrl: string, fileName: string): string {
-  return `<!DOCTYPE html>
+const getImageWrapHtml = (dataUrl: string, fileName: string): string =>
+  `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -120,10 +157,9 @@ function getImageWrapHtml(dataUrl: string, fileName: string): string {
 <img src="${dataUrl}" alt="${escapeHtml(fileName)}" onload="if(window.katsuWebview)katsuWebview.postMessage({type:'media-dimensions',w:this.naturalWidth,h:this.naturalHeight})">
 </body>
 </html>`;
-}
 
-function getVideoWrapHtml(rawUrl: string, fileName: string): string {
-  return `<!DOCTYPE html>
+const getVideoWrapHtml = (rawUrl: string, fileName: string): string =>
+  `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -139,10 +175,9 @@ function getVideoWrapHtml(rawUrl: string, fileName: string): string {
 <video src="${rawUrl}" controls autoplay onloadedmetadata="if(window.katsuWebview)katsuWebview.postMessage({type:'media-dimensions',w:this.videoWidth,h:this.videoHeight})"></video>
 </body>
 </html>`;
-}
 
-function getAudioWrapHtml(rawUrl: string, fileName: string): string {
-  return `<!DOCTYPE html>
+const getAudioWrapHtml = (rawUrl: string, fileName: string): string =>
+  `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -169,57 +204,86 @@ function getAudioWrapHtml(rawUrl: string, fileName: string): string {
 <audio src="${rawUrl}" controls autoplay style="width: 80%;"></audio>
 </body>
 </html>`;
-}
 
-export type FilePreviewResult = {
+export interface FilePreviewResult {
   url: string;
   fileName: string;
   nativeWidth?: number;
   nativeHeight?: number;
+}
+
+const getImageDimensions = (url: string): Promise<{ w: number; h: number }> =>
+  Effect.runPromise(
+    Effect.async<{ w: number; h: number }, never>((resolve) => {
+      const img = new Image();
+      img.addEventListener(
+        "load",
+        () =>
+          resolve(
+            Effect.succeed({ h: img.naturalHeight, w: img.naturalWidth })
+          ),
+        { once: true }
+      );
+      img.addEventListener(
+        "error",
+        () => resolve(Effect.succeed({ h: 0, w: 0 })),
+        { once: true }
+      );
+      img.src = url;
+    })
+  );
+
+const fileToDataUrl = (file: File): Promise<string> =>
+  Effect.runPromise(
+    Effect.async<string, never>((resolve) => {
+      const reader = new FileReader();
+      reader.addEventListener(
+        "load",
+        () => resolve(Effect.succeed(reader.result as string)),
+        { once: true }
+      );
+      reader.addEventListener("error", () => resolve(Effect.succeed("")), {
+        once: true,
+      });
+      reader.readAsDataURL(file);
+    })
+  );
+
+const getVideoDimensions = (url: string): Promise<{ w: number; h: number }> =>
+  Effect.runPromise(
+    Effect.async<{ w: number; h: number }, never>((resolve) => {
+      const video = document.createElement("video");
+      video.addEventListener(
+        "loadedmetadata",
+        () =>
+          resolve(
+            Effect.succeed({ h: video.videoHeight, w: video.videoWidth })
+          ),
+        { once: true }
+      );
+      video.addEventListener(
+        "error",
+        () => resolve(Effect.succeed({ h: 0, w: 0 })),
+        { once: true }
+      );
+      video.src = url;
+    })
+  );
+
+const saveHtmlToTemp = (name: string, html: string): Promise<string> => {
+  const { buffer } = new TextEncoder().encode(html);
+  const rawName = `${name.replace(/\.[^.]+$/u, "")}.katsu-html`;
+  return window.electronAPI.saveTempFile(rawName, buffer);
 };
 
-function getImageDimensions(url: string): Promise<{ w: number; h: number }> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-    img.onerror = () => resolve({ w: 0, h: 0 });
-    img.src = url;
-  });
-}
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function getVideoDimensions(url: string): Promise<{ w: number; h: number }> {
-  return new Promise((resolve) => {
-    const video = document.createElement("video");
-    video.onloadedmetadata = () =>
-      resolve({ w: video.videoWidth, h: video.videoHeight });
-    video.onerror = () => resolve({ w: 0, h: 0 });
-    video.src = url;
-  });
-}
-
-async function saveHtmlToTemp(name: string, html: string): Promise<string> {
-  const buffer = new TextEncoder().encode(html).buffer;
-  const rawName = name.replace(/\.[^.]+$/, "") + ".katsu-html";
-  return window.electronAPI.saveTempFile(rawName, buffer);
-}
-
-async function saveRawToTemp(name: string, file: File): Promise<string> {
+const saveRawToTemp = async (name: string, file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
   return window.electronAPI.saveTempFile(name, buffer);
-}
+};
 
-export async function createFilePreview(
+export const createFilePreview = async (
   file: File
-): Promise<FilePreviewResult> {
+): Promise<FilePreviewResult> => {
   const fileName = file.name;
   const mimeType = file.type || "application/octet-stream";
 
@@ -227,7 +291,10 @@ export async function createFilePreview(
     const text = await file.text();
     const html = getTextWrapHtml(text, fileName);
     const filePath = await saveHtmlToTemp(fileName, html);
-    return { url: `katsu://preview/${encodeURIComponent(filePath)}?raw`, fileName };
+    return {
+      fileName,
+      url: `katsu://preview/${encodeURIComponent(filePath)}?raw`,
+    };
   }
 
   if (mimeType.startsWith("image/") || mimeType === "image/svg+xml") {
@@ -236,10 +303,10 @@ export async function createFilePreview(
     const html = getImageWrapHtml(dataUrl, fileName);
     const filePath = await saveHtmlToTemp(fileName, html);
     return {
-      url: `katsu://preview/${encodeURIComponent(filePath)}?raw`,
       fileName,
-      nativeWidth: w || undefined,
       nativeHeight: h || undefined,
+      nativeWidth: w || undefined,
+      url: `katsu://preview/${encodeURIComponent(filePath)}?raw`,
     };
   }
 
@@ -253,10 +320,10 @@ export async function createFilePreview(
     const html = getVideoWrapHtml(rawUrl, fileName);
     const htmlPath = await saveHtmlToTemp(fileName, html);
     return {
-      url: `katsu://preview/${encodeURIComponent(htmlPath)}?raw`,
       fileName,
-      nativeWidth: w || undefined,
       nativeHeight: h || undefined,
+      nativeWidth: w || undefined,
+      url: `katsu://preview/${encodeURIComponent(htmlPath)}?raw`,
     };
   }
 
@@ -265,17 +332,30 @@ export async function createFilePreview(
     const rawUrl = `katsu://preview/${encodeURIComponent(rawPath)}?raw`;
     const html = getAudioWrapHtml(rawUrl, fileName);
     const htmlPath = await saveHtmlToTemp(fileName, html);
-    return { url: `katsu://preview/${encodeURIComponent(htmlPath)}?raw`, fileName };
+    return {
+      fileName,
+      url: `katsu://preview/${encodeURIComponent(htmlPath)}?raw`,
+    };
   }
 
   if (mimeType === "application/pdf") {
     const filePath = await saveRawToTemp(fileName, file);
-    return { url: `katsu://preview/${encodeURIComponent(filePath)}?raw`, fileName };
+    return {
+      fileName,
+      url: `katsu://preview/${encodeURIComponent(filePath)}?raw`,
+    };
   }
 
   const html = getDownloadHtml(fileName);
   const filePath = await saveHtmlToTemp(fileName, html);
-  return { url: `katsu://preview/${encodeURIComponent(filePath)}?raw`, fileName };
-}
+  return {
+    fileName,
+    url: `katsu://preview/${encodeURIComponent(filePath)}?raw`,
+  };
+};
 
-export function revokeBlobUrl(_url: string): void {}
+export const revokeBlobUrl = (url: string): void => {
+  if (url.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
+};

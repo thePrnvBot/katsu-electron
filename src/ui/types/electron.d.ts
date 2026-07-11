@@ -8,22 +8,27 @@ interface ElectronAPI {
     canceled: boolean;
     filePaths: string[];
   }>;
-  onStateLoaded: (callback: (windows: unknown[]) => void) => () => void;
-  onEvent: (callback: (event: unknown) => void) => () => void;
+  setStateLoadedHandler: (handler: (windows: unknown[]) => void) => void;
+  setEventHandler: (handler: (event: unknown) => void) => void;
   platform: string;
   getWebviewPreloadPath: () => string;
-  onBlockedCount: (callback: (count: number) => void) => () => void;
-  onPermissionRequest: (
-    callback: (request: {
+  setBlockedCountHandler: (
+    handler: (data: { count: number; origin: string }) => void
+  ) => void;
+  setPermissionRequestHandler: (
+    handler: (request: {
       id: string;
       permission: string;
       origin: string;
       message: string;
     }) => void
-  ) => () => void;
-  respondToPermission: (permissionId: string, granted: boolean) => Promise<unknown>;
+  ) => void;
+  respondToPermission: (
+    permissionId: string,
+    granted: boolean
+  ) => Promise<unknown>;
   saveState: (windows: unknown[]) => Promise<unknown>;
-  onRequestSave: (callback: () => void) => () => void;
+  setRequestSaveHandler: (handler: () => void) => void;
   saveStateResponse: (windows: unknown[]) => Promise<unknown>;
   saveTempFile: (name: string, buffer: ArrayBuffer) => Promise<string>;
 }

@@ -1,17 +1,21 @@
-import * as Effect from "effect/Effect";
+import * as fs from "node:fs/promises";
+import path from "node:path";
+
 import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { IPCCommand } from "../schemas/IPCSchemas.js";
-import { IPCError } from "../shared/types.js";
 import { app } from "electron";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
+
+import { IPCCommand } from "../schemas/ipc-schemas.js";
+import { IPCError } from "../shared/types.js";
 
 type CommandHandler = (payload: unknown) => Effect.Effect<unknown, IPCError>;
 
 export interface IPCRouter {
-  readonly handleCommand: (command: unknown) => Effect.Effect<unknown, IPCError>;
+  readonly handleCommand: (
+    command: unknown
+  ) => Effect.Effect<unknown, IPCError>;
   readonly registerHandler: (
     type: string,
     handler: CommandHandler
@@ -22,17 +26,16 @@ export const IPCRouter = Context.GenericTag<IPCRouter>("IPCRouter");
 
 const handlers = new Map<string, CommandHandler>();
 
-function getStateFilePath(): string {
-  return path.join(app.getPath("userData"), "windows.json");
-}
+const getStateFilePath = (): string =>
+  path.join(app.getPath("userData"), "windows.json");
 
 export const IPCRouterLive = Layer.succeed(IPCRouter, {
   handleCommand: (command: unknown) =>
-    Effect.gen(function* () {
+    Effect.gen(function* handleCommand() {
       const decoded = yield* Effect.try({
-        try: () => Schema.decodeUnknownSync(IPCCommand)(command),
         catch: () =>
           new IPCError("SchemaValidationFailed", JSON.stringify(command)),
+        try: () => Schema.decodeUnknownSync(IPCCommand)(command),
       });
 
       const handler = handlers.get(decoded.type);
@@ -50,28 +53,28 @@ export const IPCRouterLive = Layer.succeed(IPCRouter, {
 });
 
 const stateSaveHandler: CommandHandler = (payload) =>
-  Effect.gen(function* () {
-    const { windows } = payload as { windows: Array<Record<string, unknown>> };
+  Effect.gen(function* stateSaveHandlerGen() {
+    const { windows } = payload as { windows: Record<string, unknown>[] };
 
     const filePath = getStateFilePath();
-    const tmpPath = filePath + ".tmp";
+    const tmpPath = `${filePath}.tmp`;
     const content = JSON.stringify(windows, null, 2);
 
     yield* Effect.tryPromise({
-      try: () => fs.writeFile(tmpPath, content, "utf-8"),
       catch: (err) => new IPCError("CommandFailed", "state:save", err),
+      try: () => fs.writeFile(tmpPath, content, "utf-8"),
     });
 
     yield* Effect.tryPromise({
-      try: () => fs.rename(tmpPath, filePath),
       catch: (err) => new IPCError("CommandFailed", "state:save", err),
+      try: () => fs.rename(tmpPath, filePath),
     });
 
     return { saved: windows.length };
   });
 
 Effect.runSync(
-  Effect.gen(function* () {
+  Effect.gen(function* registerStateSave() {
     const router = yield* IPCRouter;
     return yield* router.registerHandler("state:save", stateSaveHandler);
   }).pipe(Effect.provide(IPCRouterLive))

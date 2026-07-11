@@ -1,12 +1,16 @@
-import * as Effect from "effect/Effect";
-import * as Context from "effect/Context";
-import * as Layer from "effect/Layer";
-import { ProtocolError } from "../shared/types.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+
+import { ProtocolError } from "../shared/types.js";
+
 export interface ProtocolHandler {
-  readonly handleRequest: (url: string) => Effect.Effect<Response, ProtocolError>;
+  readonly handleRequest: (
+    url: string
+  ) => Effect.Effect<Response, ProtocolError>;
   readonly generateTextPreview: (
     content: string,
     filename: string
@@ -19,67 +23,63 @@ export interface ProtocolHandler {
   readonly getCacheSize: Effect.Effect<number>;
 }
 
-export const ProtocolHandler = Context.GenericTag<ProtocolHandler>("ProtocolHandler");
+export const ProtocolHandler =
+  Context.GenericTag<ProtocolHandler>("ProtocolHandler");
 
 const MIME_TYPES: Record<string, string> = {
-  ".txt": "text/plain",
-  ".html": "text/html",
   ".css": "text/css",
+  ".gif": "image/gif",
+  ".go": "text/x-go",
+  ".html": "text/html",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
   ".js": "text/javascript",
   ".json": "application/json",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".svg": "image/svg+xml",
-  ".mp4": "video/mp4",
-  ".webm": "video/webm",
-  ".mp3": "audio/mpeg",
-  ".wav": "audio/wav",
-  ".pdf": "application/pdf",
-  ".md": "text/markdown",
-  ".ts": "text/typescript",
-  ".tsx": "text/typescript",
   ".jsx": "text/javascript",
+  ".katsu-html": "text/html",
+  ".md": "text/markdown",
+  ".mp3": "audio/mpeg",
+  ".mp4": "video/mp4",
+  ".pdf": "application/pdf",
+  ".png": "image/png",
   ".py": "text/x-python",
   ".rs": "text/x-rust",
-  ".go": "text/x-go",
-  ".katsu-html": "text/html",
+  ".svg": "image/svg+xml",
+  ".ts": "text/typescript",
+  ".tsx": "text/typescript",
+  ".txt": "text/plain",
+  ".wav": "audio/wav",
+  ".webm": "video/webm",
 };
 
-function getMimeType(filePath: string): string {
-  const ext = filePath.substring(filePath.lastIndexOf(".")).toLowerCase();
+const getMimeType = (filePath: string): string => {
+  const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
   return MIME_TYPES[ext] ?? "application/octet-stream";
-}
+};
 
-function isTextMimeType(mimeType: string): boolean {
-  return mimeType.startsWith("text/") || mimeType === "application/json";
-}
+const isTextMimeType = (mimeType: string): boolean =>
+  mimeType.startsWith("text/") || mimeType === "application/json";
 
-function isVideoMimeType(mimeType: string): boolean {
-  return mimeType.startsWith("video/");
-}
+const isVideoMimeType = (mimeType: string): boolean =>
+  mimeType.startsWith("video/");
 
-function isAudioMimeType(mimeType: string): boolean {
-  return mimeType.startsWith("audio/");
-}
+const isAudioMimeType = (mimeType: string): boolean =>
+  mimeType.startsWith("audio/");
 
-function isImageMimeType(mimeType: string): boolean {
-  return mimeType.startsWith("image/");
-}
+const isImageMimeType = (mimeType: string): boolean =>
+  mimeType.startsWith("image/");
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+const escapeHtml = (str: string): string =>
+  str
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 
 const cache = new Map<string, string>();
 
-function generateTextPreviewHtml(content: string, filename: string): string {
+const generateTextPreviewHtml = (content: string, filename: string): string => {
   const lang = filename.split(".").pop() ?? "text";
   return `<!DOCTYPE html>
 <html>
@@ -118,10 +118,10 @@ function generateTextPreviewHtml(content: string, filename: string): string {
 <pre>${escapeHtml(content)}</pre>
 </body>
 </html>`;
-}
+};
 
-function generateImagePreviewHtml(filename: string, rawUrl: string): string {
-  return `<!DOCTYPE html>
+const generateImagePreviewHtml = (filename: string, rawUrl: string): string =>
+  `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -138,10 +138,9 @@ function generateImagePreviewHtml(filename: string, rawUrl: string): string {
 <img src="${escapeHtml(rawUrl)}" alt="${escapeHtml(filename)}" onload="if(window.katsuWebview)katsuWebview.postMessage({type:'media-dimensions',w:this.naturalWidth,h:this.naturalHeight})">
 </body>
 </html>`;
-}
 
-function generateVideoPreviewHtml(filename: string, rawUrl: string): string {
-  return `<!DOCTYPE html>
+const generateVideoPreviewHtml = (filename: string, rawUrl: string): string =>
+  `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -158,10 +157,9 @@ function generateVideoPreviewHtml(filename: string, rawUrl: string): string {
 <video src="${escapeHtml(rawUrl)}" controls autoplay onloadedmetadata="if(window.katsuWebview)katsuWebview.postMessage({type:'media-dimensions',w:this.videoWidth,h:this.videoHeight})"></video>
 </body>
 </html>`;
-}
 
-function generateAudioPreviewHtml(filename: string, rawUrl: string): string {
-  return `<!DOCTYPE html>
+const generateAudioPreviewHtml = (filename: string, rawUrl: string): string =>
+  `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -179,10 +177,9 @@ function generateAudioPreviewHtml(filename: string, rawUrl: string): string {
 <audio src="${escapeHtml(rawUrl)}" controls autoplay></audio>
 </body>
 </html>`;
-}
 
-function generateErrorPageHtml(error: Error, url: string): string {
-  return `<!DOCTYPE html>
+const generateErrorPageHtml = (error: Error, url: string): string =>
+  `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -200,36 +197,42 @@ function generateErrorPageHtml(error: Error, url: string): string {
   <p>${escapeHtml(error.message)}</p>
 </body>
 </html>`;
-}
 
-function validateFilePath(filePath: string): Effect.Effect<string, ProtocolError> {
-  return Effect.gen(function* () {
+const validateFilePath = (
+  filePath: string
+): Effect.Effect<string, ProtocolError> =>
+  Effect.gen(function* validateFilePathGen() {
     if (!path.isAbsolute(filePath)) {
-      return yield* Effect.fail(
-        new ProtocolError("InvalidPath", filePath)
-      );
+      return yield* Effect.fail(new ProtocolError("InvalidPath", filePath));
     }
 
     const resolved = path.resolve(filePath);
 
     const stat = yield* Effect.tryPromise({
-      try: () => fs.stat(resolved),
       catch: () => new ProtocolError("FileNotFound", filePath),
+      try: () => fs.stat(resolved),
     });
 
     if (!stat.isFile()) {
-      return yield* Effect.fail(
-        new ProtocolError("InvalidPath", filePath)
-      );
+      return yield* Effect.fail(new ProtocolError("InvalidPath", filePath));
     }
 
     return resolved;
   });
-}
 
 export const ProtocolHandlerLive = Layer.succeed(ProtocolHandler, {
+  clearCache: Effect.sync(() => cache.clear()),
+
+  generateErrorPage: (error: Error, url: string) =>
+    Effect.succeed(generateErrorPageHtml(error, url)),
+
+  generateTextPreview: (content: string, filename: string) =>
+    Effect.succeed(generateTextPreviewHtml(content, filename)),
+
+  getCacheSize: Effect.succeed(cache.size),
+
   handleRequest: (url: string) =>
-    Effect.gen(function* () {
+    Effect.gen(function* handleRequest() {
       const parsedUrl = new URL(url);
       const isRaw = parsedUrl.searchParams.has("raw");
       const rawUrl = `${url}${url.includes("?") ? "&" : "?"}raw`;
@@ -241,8 +244,8 @@ export const ProtocolHandlerLive = Layer.succeed(ProtocolHandler, {
 
       if (isRaw) {
         const content = yield* Effect.tryPromise({
-          try: () => fs.readFile(validatedPath),
           catch: (err) => new ProtocolError("FileNotFound", validatedPath, err),
+          try: () => fs.readFile(validatedPath),
         });
 
         const mimeType = getMimeType(validatedPath);
@@ -252,8 +255,8 @@ export const ProtocolHandlerLive = Layer.succeed(ProtocolHandler, {
         );
         return new Response(arrayBuffer, {
           headers: {
-            "Content-Type": mimeType,
             "Content-Length": String(content.byteLength),
+            "Content-Type": mimeType,
           },
         });
       }
@@ -266,12 +269,12 @@ export const ProtocolHandlerLive = Layer.succeed(ProtocolHandler, {
       }
 
       const content = yield* Effect.tryPromise({
-        try: () => fs.readFile(validatedPath),
         catch: (err) => new ProtocolError("FileNotFound", validatedPath, err),
+        try: () => fs.readFile(validatedPath),
       });
 
       const mimeType = getMimeType(validatedPath);
-      const filename = validatedPath.split(/[/\\]/).pop() ?? validatedPath;
+      const filename = validatedPath.split(/[/\\]/u).pop() ?? validatedPath;
 
       if (isTextMimeType(mimeType)) {
         const html = generateTextPreviewHtml(
@@ -311,19 +314,9 @@ export const ProtocolHandlerLive = Layer.succeed(ProtocolHandler, {
       );
       return new Response(arrayBuffer, {
         headers: {
-          "Content-Type": mimeType,
           "Content-Length": String(content.byteLength),
+          "Content-Type": mimeType,
         },
       });
     }),
-
-  generateTextPreview: (content: string, filename: string) =>
-    Effect.succeed(generateTextPreviewHtml(content, filename)),
-
-  generateErrorPage: (error: Error, url: string) =>
-    Effect.succeed(generateErrorPageHtml(error, url)),
-
-  clearCache: Effect.sync(() => cache.clear()),
-
-  getCacheSize: Effect.succeed(cache.size),
 });

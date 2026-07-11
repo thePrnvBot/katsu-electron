@@ -2,7 +2,8 @@
 
 @font-face {
   font-family: "Geist";
-  src: url("../../../node_modules/geist/dist/fonts/geist-sans/Geist-Regular.woff2") format("woff2");
+  src: url("../../../node_modules/geist/dist/fonts/geist-sans/Geist-Regular.woff2")
+    format("woff2");
 }
 
 :root {
@@ -11,7 +12,8 @@
   font-family: "Geist", system-ui, sans-serif;
 }
 
-html, body {
+html,
+body {
   position: fixed;
   inset: 0;
   overflow: hidden;
