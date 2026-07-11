@@ -13,8 +13,9 @@ interface ElectronAPI {
   platform: string;
   getWebviewPreloadPath: () => string;
   setBlockedCountHandler: (
+    subscriberId: string,
     handler: (data: { count: number; origin: string }) => void
-  ) => void;
+  ) => () => void;
   setPermissionRequestHandler: (
     handler: (request: {
       id: string;

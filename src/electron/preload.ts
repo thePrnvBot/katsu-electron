@@ -6,11 +6,14 @@ ipcRenderer.once("config", (_event, config: { webviewPreloadPath: string }) => {
   ({ webviewPreloadPath } = config);
 });
 
-let _blockedCountHandler:
-  | ((data: { count: number; origin: string }) => void)
-  | null = null;
+const _blockedCountSubscribers = new Map<
+  string,
+  (data: { count: number; origin: string }) => void
+>();
 ipcRenderer.on("adblock:count", (_event, data) => {
-  _blockedCountHandler?.(data);
+  for (const handler of _blockedCountSubscribers.values()) {
+    handler(data);
+  }
 });
 
 let _eventHandler: ((event: unknown) => void) | null = null;
@@ -71,9 +74,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("katsu:command", command),
 
   setBlockedCountHandler: (
+    subscriberId: string,
     handler: (data: { count: number; origin: string }) => void
-  ) => {
-    _blockedCountHandler = handler;
+  ): (() => void) => {
+    _blockedCountSubscribers.set(subscriberId, handler);
+    return () => {
+      _blockedCountSubscribers.delete(subscriberId);
+    };
   },
 
   setEventHandler: (handler: (event: unknown) => void) => {

@@ -148,7 +148,7 @@ export const AdBlockerLive = Layer.succeed(AdBlocker, {
             url: details.url,
           }) !== 0;
         if (blocked) {
-          const origin = details.originURL;
+          const { origin } = new URL(details.originURL);
           perOriginCounts.set(origin, (perOriginCounts.get(origin) ?? 0) + 1);
         }
         return blocked;

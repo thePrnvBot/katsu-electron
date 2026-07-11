@@ -112,6 +112,7 @@ export default function App() {
   const grid = useStore((s) => s.grid);
   const windows = useStore((s) => s.windows);
   const addWindow = useStore((s) => s.addWindow);
+  const bringToFront = useStore((s) => s.bringToFront);
   const setActiveWindow = useStore((s) => s.setActiveWindow);
   const [urlField, setUrlField] = useState("");
   const wheelAccum = useRef({ x: 0, y: 0 });
@@ -214,6 +215,7 @@ export default function App() {
       y: currentCell.y * grid.cellHeight + 100 + Math.random() * 50,
     });
     setActiveWindow(newWindowId);
+    bringToFront(newWindowId);
   };
 
   const openSite = () => {
@@ -260,6 +262,7 @@ export default function App() {
         y: currentCell.y * grid.cellHeight + (grid.cellHeight - h) / 2,
       });
       setActiveWindow(newWindowId);
+      bringToFront(newWindowId);
     }
   };
 
@@ -309,6 +312,7 @@ export default function App() {
           y: currentCell.y * grid.cellHeight + (grid.cellHeight - h) / 2,
         });
         setActiveWindow(newWindowId);
+        bringToFront(newWindowId);
       }
     }
   };

@@ -115,17 +115,21 @@ export const Window = ({ windowId }: { windowId: string }) => {
     if (!showAdPill) {
       return;
     }
-    window.electronAPI.setBlockedCountHandler((data) => {
-      try {
-        const winOrigin = new URL(win?.url ?? "").origin;
-        if (data.origin === winOrigin) {
-          setBlockedCount(data.count);
+    const unsub = window.electronAPI.setBlockedCountHandler(
+      windowId,
+      (data) => {
+        try {
+          const winOrigin = new URL(win?.url ?? "").origin;
+          if (data.origin === winOrigin) {
+            setBlockedCount(data.count);
+          }
+        } catch {
+          // invalid URL
         }
-      } catch {
-        // invalid URL
       }
-    });
-  }, [showAdPill, win?.url]);
+    );
+    return unsub;
+  }, [showAdPill, win?.url, windowId]);
 
   useEffect(
     () => () => {

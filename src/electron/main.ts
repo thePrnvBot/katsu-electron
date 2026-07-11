@@ -114,15 +114,16 @@ app.on("ready", async () => {
 
     if (blocked) {
       try {
+        const { origin } = new URL(originURL);
         const count = await Effect.runPromise(
           Effect.gen(function* count() {
             const adBlocker = yield* AdBlocker;
-            return yield* adBlocker.getBlockedCountForOrigin(originURL);
+            return yield* adBlocker.getBlockedCountForOrigin(origin);
           }).pipe(Effect.provide(MainLayer))
         );
         mainWindow?.webContents.send("adblock:count", {
           count,
-          origin: originURL,
+          origin,
         });
       } catch {
         /* intentionally ignored */
