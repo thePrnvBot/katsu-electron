@@ -1,7 +1,8 @@
-import type { Window } from "../store/window-store";
+import type { Settings, Window } from "../store/window-store";
 
 const DEBOUNCE_MS = 500;
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let saveSettingsTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export const debouncedSaveState = (windows: Window[]) => {
   if (saveTimeout) {
@@ -24,3 +25,20 @@ export const debouncedSaveState = (windows: Window[]) => {
     }
   }, DEBOUNCE_MS);
 };
+
+export const debouncedSaveSettings = (settings: Settings) => {
+  if (saveSettingsTimeout) {
+    clearTimeout(saveSettingsTimeout);
+  }
+
+  saveSettingsTimeout = setTimeout(async () => {
+    try {
+      await window.electronAPI.saveSettings(settings);
+    } catch (error: unknown) {
+      console.error("Failed to save settings:", error);
+    }
+  }, DEBOUNCE_MS);
+};
+
+export const loadSettingsFromDisk = (): Promise<Settings> =>
+  window.electronAPI.loadSettings() as Promise<Settings>;
