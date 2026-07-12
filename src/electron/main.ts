@@ -23,6 +23,15 @@ import { isDev } from "./util.js";
 let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
 
+const chromeVersion = process.versions.chrome;
+const cleanUserAgent = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
+
+app.userAgentFallback = cleanUserAgent;
+
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-background-timer-throttling");
+app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+
 app.on("web-contents-created", (_event, contents) => {
   contents.on("did-navigate", (_navEvent, url) => {
     try {
@@ -85,6 +94,37 @@ app.on("ready", async () => {
 
   // Register katsu:// protocol on webview partition session
   const katsuSession = session.fromPartition("persist:katsu");
+
+  katsuSession.setUserAgent(cleanUserAgent);
+
+  katsuSession.setPermissionRequestHandler((_wc, permission, callback) => {
+    if (permission === "media") {
+      callback(true);
+      return;
+    }
+    callback(false);
+  });
+
+  katsuSession.setPermissionCheckHandler(() => true);
+
+  katsuSession.webRequest.onBeforeSendHeaders(
+    { urls: ["<all_urls>"] },
+    (details, callback) => {
+      const ua =
+        details.requestHeaders["User-Agent"] ||
+        details.requestHeaders["user-agent"];
+      if (ua) {
+        details.requestHeaders["User-Agent"] = cleanUserAgent;
+        details.requestHeaders["user-agent"] = cleanUserAgent;
+      }
+      details.requestHeaders["sec-ch-ua"] =
+        `"Chromium";v="${chromeVersion}", "Google Chrome";v="${chromeVersion}", "Not.A/Brand";v="99"`;
+      details.requestHeaders["sec-ch-ua-mobile"] = "?0";
+      details.requestHeaders["sec-ch-ua-platform"] = `"Windows"`;
+      callback({ cancel: false, requestHeaders: details.requestHeaders });
+    }
+  );
+
   katsuSession.protocol.handle("katsu", (request: { url: string }) => {
     const program = Effect.gen(function* program() {
       const handler = yield* ProtocolHandler;
@@ -211,9 +251,21 @@ app.on("ready", async () => {
     }
   );
 
+  // Handle settings:load
+  ipcMain.handle("settings:load", async () => {
+    const settingsPath = path.join(app.getPath("userData"), "settings.json");
+    try {
+      const content = await fs.readFile(settingsPath, "utf-8");
+      return JSON.parse(content);
+    } catch {
+      return { windowPeeking: false };
+    }
+  });
+
   // Send config and saved state after renderer loads
   mainWindow.webContents.once("did-finish-load", async () => {
     mainWindow?.webContents.send("config", {
+      userAgent: cleanUserAgent,
       webviewPreloadPath: path.join(
         app.getAppPath(),
         "dist-electron",
@@ -233,6 +285,17 @@ app.on("ready", async () => {
       mainWindow?.webContents.send("state:loaded", savedWindows);
     } catch {
       mainWindow?.webContents.send("state:loaded", []);
+    }
+
+    // Load and send settings
+    const settingsPath = path.join(app.getPath("userData"), "settings.json");
+    try {
+      const content = await fs.readFile(settingsPath, "utf-8");
+      mainWindow?.webContents.send("settings:loaded", JSON.parse(content));
+    } catch {
+      mainWindow?.webContents.send("settings:loaded", {
+        windowPeeking: false,
+      });
     }
   });
 

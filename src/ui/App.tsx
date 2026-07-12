@@ -8,7 +8,7 @@ import { PermissionDialog } from "./components/permission-dialog";
 import { SearchBar } from "./components/search-bar";
 import { TitleBar } from "./components/title-bar";
 import { Window } from "./components/window";
-import { World } from "./components/world";
+import { World } from "./components/World";
 import { useStore } from "./store/window-store";
 import { createFilePreview } from "./utils/file-preview";
 
