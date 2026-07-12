@@ -1,9 +1,10 @@
 import { Command } from "cmdk";
+import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useStore } from "../store/window-store";
 
-type CommandPages = "root" | "windows" | "layout";
+type CommandPages = "root" | "windows" | "layout" | "settings";
 
 interface SubMenuProps {
   navigateToPage: (page: CommandPages) => void;
@@ -26,6 +27,12 @@ const RootMenu = ({ navigateToPage }: SubMenuProps) => (
       className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
     >
       Set Window Layout
+    </Command.Item>
+    <Command.Item
+      onSelect={() => navigateToPage("settings")}
+      className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
+    >
+      Settings
     </Command.Item>
   </>
 );
@@ -117,6 +124,36 @@ const LayoutMenu = ({ closeAndResetMenu }: SubMenuProps) => {
   );
 };
 
+const SettingsMenu = ({ closeAndResetMenu }: SubMenuProps) => {
+  const settings = useStore((s) => s.settings);
+  const toggleWindowPeeking = useStore((s) => s.toggleWindowPeeking);
+  const refreshGridSize = useStore((s) => s.refreshGridSize);
+
+  return (
+    <>
+      <Command.Item
+        onSelect={() => {
+          toggleWindowPeeking();
+          closeAndResetMenu();
+        }}
+        className="flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
+      >
+        <span>Window Peeking</span>
+        {settings.windowPeeking && <Check className="h-4 w-4 text-green-400" />}
+      </Command.Item>
+      <Command.Item
+        onSelect={() => {
+          refreshGridSize();
+          closeAndResetMenu();
+        }}
+        className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
+      >
+        Refresh Grid Size
+      </Command.Item>
+    </>
+  );
+};
+
 export const CommandMenu = () => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -204,6 +241,12 @@ export const CommandMenu = () => {
         )}
         {page === "layout" && (
           <LayoutMenu
+            navigateToPage={navigateToPage}
+            closeAndResetMenu={closeAndResetMenu}
+          />
+        )}
+        {page === "settings" && (
+          <SettingsMenu
             navigateToPage={navigateToPage}
             closeAndResetMenu={closeAndResetMenu}
           />
