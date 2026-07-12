@@ -10,6 +10,7 @@ interface WorldProps {
 export const World = ({ children, onFileDrop }: WorldProps) => {
   const camera = useStore((s) => s.camera);
   const grid = useStore((s) => s.grid);
+  const windowPeeking = useStore((s) => s.settings.windowPeeking);
   const [dragOver, setDragOver] = useState(false);
   const dragCounter = useRef(0);
 
@@ -68,7 +69,7 @@ export const World = ({ children, onFileDrop }: WorldProps) => {
         style={{
           height: worldH,
           top: 32,
-          transform: `translate3d(${-camera.x}px, ${-camera.y}px, 0)`,
+          transform: `translate3d(${-camera.x}px, ${-camera.y}px, 0)${windowPeeking ? " scale(0.9)" : ""}`,
           transformOrigin: "0 0",
           width: worldW,
         }}
