@@ -32,6 +32,15 @@ export const StateSaveCommand = Schema.Struct({
   type: Schema.Literal("state:save"),
 });
 
+export const SettingsSaveCommand = Schema.Struct({
+  payload: Schema.Struct({
+    settings: Schema.Struct({
+      windowPeeking: Schema.Boolean,
+    }),
+  }),
+  type: Schema.Literal("settings:save"),
+});
+
 export const WindowControlCommand = Schema.Struct({
   payload: Schema.Union(
     Schema.Literal("minimize"),
@@ -53,6 +62,7 @@ export const IPCCommand = Schema.Union(
   DialogOpenFileCommand,
   StateLoadCommand,
   StateSaveCommand,
+  SettingsSaveCommand,
   WindowControlCommand,
   PermissionRespondCommand
 );
