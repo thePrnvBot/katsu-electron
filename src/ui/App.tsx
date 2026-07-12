@@ -137,6 +137,19 @@ export default function App() {
         }
       }
     });
+
+    window.electronAPI.setSettingsLoadedHandler((savedSettings: unknown) => {
+      if (
+        savedSettings &&
+        typeof savedSettings === "object" &&
+        "windowPeeking" in savedSettings
+      ) {
+        useStore.getState().loadSettings({
+          windowPeeking: (savedSettings as { windowPeeking: boolean })
+            .windowPeeking,
+        });
+      }
+    });
   }, [addWindow]);
 
   // Save state when main process requests it (before quit)
