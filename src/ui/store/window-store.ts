@@ -1,7 +1,10 @@
 import { create } from "zustand";
 
 import { revokeBlobUrl } from "../utils/file-preview";
-import { debouncedSaveState } from "../utils/persistence";
+import {
+  debouncedSaveSettings,
+  debouncedSaveState,
+} from "../utils/persistence";
 import { resolveLayout } from "../utils/window-layouts";
 import type { WindowLayout } from "../utils/window-layouts";
 
@@ -25,6 +28,10 @@ export interface Window {
   prevBounds?: Bounds;
 }
 
+export interface Settings {
+  windowPeeking: boolean;
+}
+
 export interface State {
   windows: Window[];
   camera: { x: number; y: number };
@@ -32,6 +39,7 @@ export interface State {
   activeWindowId: string | null;
   grid: { cols: number; rows: number; cellWidth: number; cellHeight: number };
   currentCell: { x: number; y: number };
+  settings: Settings;
 
   addWindow: (w: Window) => void;
   updateWindow: (id: string, patch: Partial<Window>) => void;
@@ -43,6 +51,9 @@ export interface State {
   centerOnWindow: (id: string) => void;
   bringToFront: (id: string) => void;
   setWindowLayout: (id: string, layout: WindowLayout) => void;
+  toggleWindowPeeking: () => void;
+  refreshGridSize: () => void;
+  loadSettings: (settings: Settings) => void;
 }
 
 const COLS = 10;
@@ -93,6 +104,7 @@ export const useStore = create<State>((set, get) => ({
     cols: COLS,
     rows: ROWS,
   },
+  loadSettings: (settings) => set({ settings }),
   maximizeWindow: (id) =>
     set((s) => {
       const w = s.windows.find((x) => x.id === id);
@@ -155,6 +167,21 @@ export const useStore = create<State>((set, get) => ({
       currentCell: { x: cx, y: cy },
     });
   },
+  refreshGridSize: () =>
+    set((s) => {
+      const cellWidth = window.innerWidth;
+      const cellHeight = window.innerHeight;
+      const cx = s.currentCell.x * cellWidth;
+      const cy = s.currentCell.y * cellHeight;
+      return {
+        cameraTarget: { x: cx, y: cy },
+        grid: {
+          ...s.grid,
+          cellHeight,
+          cellWidth,
+        },
+      };
+    }),
   removeWindow: (id) =>
     set((s) => {
       const win = s.windows.find((w) => w.id === id);
@@ -188,6 +215,14 @@ export const useStore = create<State>((set, get) => ({
       ),
     }));
   },
+  settings: { windowPeeking: false },
+  toggleWindowPeeking: () =>
+    set((s) => ({
+      settings: {
+        ...s.settings,
+        windowPeeking: !s.settings.windowPeeking,
+      },
+    })),
   updateWindow: (id, patch) =>
     set((s) => ({
       windows: s.windows.map((w) => (w.id === id ? { ...w, ...patch } : w)),
@@ -199,5 +234,8 @@ export const useStore = create<State>((set, get) => ({
 useStore.subscribe((state, prevState) => {
   if (state.windows !== prevState.windows) {
     debouncedSaveState(state.windows);
+  }
+  if (state.settings !== prevState.settings) {
+    debouncedSaveSettings(state.settings);
   }
 });
