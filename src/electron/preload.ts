@@ -1,10 +1,14 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 let webviewPreloadPath = "";
+let userAgent = "";
 
-ipcRenderer.once("config", (_event, config: { webviewPreloadPath: string }) => {
-  ({ webviewPreloadPath } = config);
-});
+ipcRenderer.once(
+  "config",
+  (_event, config: { userAgent: string; webviewPreloadPath: string }) => {
+    ({ webviewPreloadPath, userAgent } = config);
+  }
+);
 
 const _blockedCountSubscribers = new Map<
   string,
@@ -48,8 +52,21 @@ ipcRenderer.once("state:loaded", (_event, windows) => {
   }
 });
 
+let _settingsLoadedData: unknown | null = null;
+let _settingsLoadedHandler: ((settings: unknown) => void) | null = null;
+ipcRenderer.once("settings:loaded", (_event, settings) => {
+  if (_settingsLoadedHandler) {
+    _settingsLoadedHandler(settings);
+  } else {
+    _settingsLoadedData = settings;
+  }
+});
+
 contextBridge.exposeInMainWorld("electronAPI", {
+  getUserAgent: () => userAgent,
   getWebviewPreloadPath: () => webviewPreloadPath,
+
+  loadSettings: () => ipcRenderer.invoke("settings:load"),
 
   openFile: () => ipcRenderer.invoke("dialog:openFile"),
 
@@ -57,6 +74,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   respondToPermission: (permissionId: string, granted: boolean) =>
     ipcRenderer.invoke(`permission:response:${permissionId}`, granted),
+
+  saveSettings: (settings: unknown) =>
+    ipcRenderer.invoke("katsu:command", {
+      payload: { settings },
+      type: "settings:save",
+    }),
 
   saveState: (windows: unknown[]) =>
     ipcRenderer.invoke("katsu:command", {
@@ -100,6 +123,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   setRequestSaveHandler: (handler: () => void) => {
     _requestSaveHandler = handler;
+  },
+
+  setSettingsLoadedHandler: (handler: (settings: unknown) => void) => {
+    _settingsLoadedHandler = handler;
+    if (_settingsLoadedData) {
+      handler(_settingsLoadedData);
+      _settingsLoadedData = null;
+    }
   },
 
   setStateLoadedHandler: (handler: (windows: unknown[]) => void) => {
