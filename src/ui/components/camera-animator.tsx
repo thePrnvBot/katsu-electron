@@ -12,16 +12,12 @@ export const CameraAnimator = () => {
     const tick = () => {
       const state = useStore.getState();
 
-      const scale = state.settings.windowPeeking ? 0.9 : 1;
-      const targetX = state.cameraTarget.x * scale;
-      const targetY = state.cameraTarget.y * scale;
-
-      const dx = targetX - state.camera.x;
-      const dy = targetY - state.camera.y;
+      const dx = state.cameraTarget.x - state.camera.x;
+      const dy = state.cameraTarget.y - state.camera.y;
 
       if (Math.abs(dx) < EPSILON && Math.abs(dy) < EPSILON) {
         useStore.setState({
-          camera: { x: targetX, y: targetY },
+          camera: { x: state.cameraTarget.x, y: state.cameraTarget.y },
         });
         running = false;
         return;
@@ -40,11 +36,7 @@ export const CameraAnimator = () => {
     };
 
     const unsubscribe = useStore.subscribe((state, prev) => {
-      if (
-        !running &&
-        (state.cameraTarget !== prev.cameraTarget ||
-          state.settings.windowPeeking !== prev.settings.windowPeeking)
-      ) {
+      if (!running && state.cameraTarget !== prev.cameraTarget) {
         running = true;
         raf = requestAnimationFrame(tick);
       }
