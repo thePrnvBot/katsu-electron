@@ -29,6 +29,9 @@ const handlers = new Map<string, CommandHandler>();
 const getStateFilePath = (): string =>
   path.join(app.getPath("userData"), "windows.json");
 
+const getSettingsFilePath = (): string =>
+  path.join(app.getPath("userData"), "settings.json");
+
 export const IPCRouterLive = Layer.succeed(IPCRouter, {
   handleCommand: (command: unknown) =>
     Effect.gen(function* handleCommand() {
@@ -77,5 +80,35 @@ Effect.runSync(
   Effect.gen(function* registerStateSave() {
     const router = yield* IPCRouter;
     return yield* router.registerHandler("state:save", stateSaveHandler);
+  }).pipe(Effect.provide(IPCRouterLive))
+);
+
+const settingsSaveHandler: CommandHandler = (payload) =>
+  Effect.gen(function* settingsSaveHandlerGen() {
+    const { settings } = payload as {
+      settings: { windowPeeking: boolean };
+    };
+
+    const filePath = getSettingsFilePath();
+    const tmpPath = `${filePath}.tmp`;
+    const content = JSON.stringify(settings, null, 2);
+
+    yield* Effect.tryPromise({
+      catch: (err) => new IPCError("CommandFailed", "settings:save", err),
+      try: () => fs.writeFile(tmpPath, content, "utf-8"),
+    });
+
+    yield* Effect.tryPromise({
+      catch: (err) => new IPCError("CommandFailed", "settings:save", err),
+      try: () => fs.rename(tmpPath, filePath),
+    });
+
+    return { saved: true };
+  });
+
+Effect.runSync(
+  Effect.gen(function* registerSettingsSave() {
+    const router = yield* IPCRouter;
+    return yield* router.registerHandler("settings:save", settingsSaveHandler);
   }).pipe(Effect.provide(IPCRouterLive))
 );
