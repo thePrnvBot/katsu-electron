@@ -1,5 +1,3 @@
-import * as Effect from "effect/Effect";
-
 const WRAP_EXTENSIONS = new Set([
   "ts",
   "tsx",
@@ -213,62 +211,42 @@ export interface FilePreviewResult {
 }
 
 const getImageDimensions = (url: string): Promise<{ w: number; h: number }> =>
-  Effect.runPromise(
-    Effect.async<{ w: number; h: number }, never>((resolve) => {
-      const img = new Image();
-      img.addEventListener(
-        "load",
-        () =>
-          resolve(
-            Effect.succeed({ h: img.naturalHeight, w: img.naturalWidth })
-          ),
-        { once: true }
-      );
-      img.addEventListener(
-        "error",
-        () => resolve(Effect.succeed({ h: 0, w: 0 })),
-        { once: true }
-      );
-      img.src = url;
-    })
-  );
+  new Promise((resolve) => {
+    const img = new Image();
+    img.addEventListener(
+      "load",
+      () => resolve({ h: img.naturalHeight, w: img.naturalWidth }),
+      { once: true }
+    );
+    img.addEventListener("error", () => resolve({ h: 0, w: 0 }), {
+      once: true,
+    });
+    img.src = url;
+  });
 
 const fileToDataUrl = (file: File): Promise<string> =>
-  Effect.runPromise(
-    Effect.async<string, never>((resolve) => {
-      const reader = new FileReader();
-      reader.addEventListener(
-        "load",
-        () => resolve(Effect.succeed(reader.result as string)),
-        { once: true }
-      );
-      reader.addEventListener("error", () => resolve(Effect.succeed("")), {
-        once: true,
-      });
-      reader.readAsDataURL(file);
-    })
-  );
+  new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(reader.result as string), {
+      once: true,
+    });
+    reader.addEventListener("error", () => resolve(""), { once: true });
+    reader.readAsDataURL(file);
+  });
 
 const getVideoDimensions = (url: string): Promise<{ w: number; h: number }> =>
-  Effect.runPromise(
-    Effect.async<{ w: number; h: number }, never>((resolve) => {
-      const video = document.createElement("video");
-      video.addEventListener(
-        "loadedmetadata",
-        () =>
-          resolve(
-            Effect.succeed({ h: video.videoHeight, w: video.videoWidth })
-          ),
-        { once: true }
-      );
-      video.addEventListener(
-        "error",
-        () => resolve(Effect.succeed({ h: 0, w: 0 })),
-        { once: true }
-      );
-      video.src = url;
-    })
-  );
+  new Promise((resolve) => {
+    const video = document.createElement("video");
+    video.addEventListener(
+      "loadedmetadata",
+      () => resolve({ h: video.videoHeight, w: video.videoWidth }),
+      { once: true }
+    );
+    video.addEventListener("error", () => resolve({ h: 0, w: 0 }), {
+      once: true,
+    });
+    video.src = url;
+  });
 
 const saveHtmlToTemp = (name: string, html: string): Promise<string> => {
   const { buffer } = new TextEncoder().encode(html);

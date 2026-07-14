@@ -1,4 +1,3 @@
-import * as Effect from "effect/Effect";
 import { useEffect, useRef, useState } from "react";
 
 import { CameraAnimator } from "./components/camera-animator";
@@ -8,25 +7,74 @@ import { PermissionDialog } from "./components/permission-dialog";
 import { SearchBar } from "./components/search-bar";
 import { TitleBar } from "./components/title-bar";
 import { Window } from "./components/window";
-import { World } from "./components/World";
-import { useStore } from "./store/window-store";
+import { World } from "./components/world";
+import { IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "./lib/constants";
+import { useCameraStore } from "./store/camera-store";
+import { useSettingsStore } from "./store/settings-store";
+import { useWindowStore } from "./store/window-store";
 import { createFilePreview } from "./utils/file-preview";
+import { computeWindowSize } from "./utils/layout";
 
-const IMAGE_EXTENSIONS = new Set([
-  "png",
-  "jpg",
-  "jpeg",
-  "gif",
-  "webp",
-  "bmp",
-  "svg",
-  "ico",
-]);
-const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "ogg", "mov", "mkv", "avi"]);
-const TITLEBAR_H = 36;
-const WINDOW_BORDER = 4;
+const getMediaDimensions = (
+  url: string,
+  ext: string
+): Promise<{ w: number; h: number }> =>
+  new Promise((resolve) => {
+    let resolved = false;
+    const safeResolve = (value: { h: number; w: number }) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(value);
+      }
+    };
 
-const normalizeUrl = (value: string) => {
+    const timeout = setTimeout(() => safeResolve({ h: 0, w: 0 }), 3000);
+
+    if (IMAGE_EXTENSIONS.has(ext)) {
+      const img = new Image();
+      img.addEventListener(
+        "load",
+        () => {
+          clearTimeout(timeout);
+          safeResolve({ h: img.naturalHeight, w: img.naturalWidth });
+        },
+        { once: true }
+      );
+      img.addEventListener(
+        "error",
+        () => {
+          clearTimeout(timeout);
+          safeResolve({ h: 0, w: 0 });
+        },
+        { once: true }
+      );
+      img.src = url;
+    } else if (VIDEO_EXTENSIONS.has(ext)) {
+      const video = document.createElement("video");
+      video.addEventListener(
+        "loadedmetadata",
+        () => {
+          clearTimeout(timeout);
+          safeResolve({ h: video.videoHeight, w: video.videoWidth });
+        },
+        { once: true }
+      );
+      video.addEventListener(
+        "error",
+        () => {
+          clearTimeout(timeout);
+          safeResolve({ h: 0, w: 0 });
+        },
+        { once: true }
+      );
+      video.src = url;
+    } else {
+      clearTimeout(timeout);
+      safeResolve({ h: 0, w: 0 });
+    }
+  });
+
+const normalizeUrl = (value: string): string | null => {
   if (!value) {
     return null;
   }
@@ -45,75 +93,15 @@ const normalizeUrl = (value: string) => {
   return `https://${value}`;
 };
 
-const getMediaDimensions = (
-  url: string,
-  ext: string
-): Promise<{ w: number; h: number }> =>
-  Effect.runPromise(
-    Effect.async<{ w: number; h: number }, never>((resolve) => {
-      let resolved = false;
-      const safeResolve = (value: { w: number; h: number }) => {
-        if (!resolved) {
-          resolved = true;
-          resolve(Effect.succeed(value));
-        }
-      };
-
-      const timeout = setTimeout(() => safeResolve({ h: 0, w: 0 }), 3000);
-
-      if (IMAGE_EXTENSIONS.has(ext)) {
-        const img = new Image();
-        img.addEventListener(
-          "load",
-          () => {
-            clearTimeout(timeout);
-            safeResolve({ h: img.naturalHeight, w: img.naturalWidth });
-          },
-          { once: true }
-        );
-        img.addEventListener(
-          "error",
-          () => {
-            clearTimeout(timeout);
-            safeResolve({ h: 0, w: 0 });
-          },
-          { once: true }
-        );
-        img.src = url;
-      } else if (VIDEO_EXTENSIONS.has(ext)) {
-        const video = document.createElement("video");
-        video.addEventListener(
-          "loadedmetadata",
-          () => {
-            clearTimeout(timeout);
-            safeResolve({ h: video.videoHeight, w: video.videoWidth });
-          },
-          { once: true }
-        );
-        video.addEventListener(
-          "error",
-          () => {
-            clearTimeout(timeout);
-            safeResolve({ h: 0, w: 0 });
-          },
-          { once: true }
-        );
-        video.src = url;
-      } else {
-        clearTimeout(timeout);
-        safeResolve({ h: 0, w: 0 });
-      }
-    })
-  );
-
 export default function App() {
-  const moveCell = useStore((s) => s.moveCell);
-  const currentCell = useStore((s) => s.currentCell);
-  const grid = useStore((s) => s.grid);
-  const windows = useStore((s) => s.windows);
-  const addWindow = useStore((s) => s.addWindow);
-  const bringToFront = useStore((s) => s.bringToFront);
-  const setActiveWindow = useStore((s) => s.setActiveWindow);
+  const moveCell = useCameraStore((s) => s.moveCell);
+  const currentCell = useCameraStore((s) => s.currentCell);
+  const grid = useCameraStore((s) => s.grid);
+  const windows = useWindowStore((s) => s.windows);
+  const addWindow = useWindowStore((s) => s.addWindow);
+  const bringToFront = useWindowStore((s) => s.bringToFront);
+  const setActiveWindow = useWindowStore((s) => s.setActiveWindow);
+  const loadSettings = useSettingsStore((s) => s.loadSettings);
   const [urlField, setUrlField] = useState("");
   const wheelAccum = useRef({ x: 0, y: 0 });
 
@@ -144,18 +132,18 @@ export default function App() {
         typeof savedSettings === "object" &&
         "windowPeeking" in savedSettings
       ) {
-        useStore.getState().loadSettings({
+        loadSettings({
           windowPeeking: (savedSettings as { windowPeeking: boolean })
             .windowPeeking,
         });
       }
     });
-  }, [addWindow]);
+  }, [addWindow, loadSettings]);
 
   // Save state when main process requests it (before quit)
   useEffect(() => {
     window.electronAPI.setRequestSaveHandler(() => {
-      const currentWindows = useStore.getState().windows;
+      const currentWindows = useWindowStore.getState().windows;
       const metadata = currentWindows.map((w) => ({
         bounds: { height: w.h, width: w.w, x: w.x, y: w.y },
         id: w.id,
@@ -246,24 +234,12 @@ export default function App() {
     for (const preview of previews) {
       const { url, fileName, nativeWidth, nativeHeight } = preview;
       const newWindowId = crypto.randomUUID();
-
-      const contentMaxW = grid.cellWidth * 0.9 - WINDOW_BORDER;
-      const contentMaxH = grid.cellHeight * 0.9 - WINDOW_BORDER - TITLEBAR_H;
-      let w = nativeWidth ?? 700;
-      let h = nativeHeight ?? 500;
-
-      if (nativeWidth && nativeHeight) {
-        const scale = Math.min(
-          contentMaxW / nativeWidth,
-          contentMaxH / nativeHeight,
-          1
-        );
-        w = Math.round(nativeWidth * scale) + WINDOW_BORDER;
-        h = Math.round(nativeHeight * scale) + WINDOW_BORDER + TITLEBAR_H;
-      } else {
-        w = Math.min(w, contentMaxW) + WINDOW_BORDER;
-        h = Math.min(h, contentMaxH) + WINDOW_BORDER + TITLEBAR_H;
-      }
+      const { w, h } = computeWindowSize(
+        nativeWidth,
+        nativeHeight,
+        grid.cellWidth,
+        grid.cellHeight
+      );
 
       addWindow({
         fileName,
@@ -296,23 +272,12 @@ export default function App() {
       );
 
       for (const { filePath, fileName, nativeH, nativeW } of fileData) {
-        const contentMaxW = grid.cellWidth * 0.9 - WINDOW_BORDER;
-        const contentMaxH = grid.cellHeight * 0.9 - WINDOW_BORDER - TITLEBAR_H;
-        let w = 700;
-        let h = 500;
-
-        if (nativeW && nativeH) {
-          const scale = Math.min(
-            contentMaxW / nativeW,
-            contentMaxH / nativeH,
-            1
-          );
-          w = Math.round(nativeW * scale) + WINDOW_BORDER;
-          h = Math.round(nativeH * scale) + WINDOW_BORDER + TITLEBAR_H;
-        } else {
-          w = Math.min(w, contentMaxW) + WINDOW_BORDER;
-          h = Math.min(h, contentMaxH) + WINDOW_BORDER + TITLEBAR_H;
-        }
+        const { w, h } = computeWindowSize(
+          nativeW,
+          nativeH,
+          grid.cellWidth,
+          grid.cellHeight
+        );
 
         const newWindowId = crypto.randomUUID();
         addWindow({
