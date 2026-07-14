@@ -1,4 +1,5 @@
-import type { Settings, Window } from "../store/window-store";
+import type { Settings } from "../store/settings-store";
+import type { Window } from "../store/window-store";
 
 const DEBOUNCE_MS = 500;
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
