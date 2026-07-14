@@ -2,11 +2,10 @@ import { Maximize, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
 
-import { useStore } from "../store/window-store";
+import { useCameraStore } from "../store/camera-store";
+import { useWindowStore } from "../store/window-store";
+import { computeWindowSize } from "../utils/layout";
 import { ErrorOverlay } from "./error-overlay";
-
-const TITLEBAR_H = 36;
-const WINDOW_BORDER = 4;
 
 const isWebUrl = (url: string) =>
   url.length > 0 && !url.startsWith("katsu://") && !url.startsWith("blob:");
@@ -54,28 +53,28 @@ const useWebviewEvents = (
         return;
       }
 
-      const state = useStore.getState();
-      const current = state.windows.find((x) => x.id === windowId);
+      const { windows } = useWindowStore.getState();
+      const current = windows.find((x) => x.id === windowId);
       if (!current || current.maximized) {
         return;
       }
 
-      const maxW = state.grid.cellWidth * 0.9;
-      const maxH = state.grid.cellHeight * 0.9;
-      const contentMaxW = maxW - WINDOW_BORDER;
-      const contentMaxH = maxH - WINDOW_BORDER - TITLEBAR_H;
-      const scale = Math.min(contentMaxW / msg.w, contentMaxH / msg.h, 1);
-      const w = Math.round(msg.w * scale) + WINDOW_BORDER;
-      const h = Math.round(msg.h * scale) + WINDOW_BORDER + TITLEBAR_H;
+      const { grid } = useCameraStore.getState();
+      const { w, h } = computeWindowSize(
+        msg.w,
+        msg.h,
+        grid.cellWidth,
+        grid.cellHeight
+      );
 
       if (Math.abs(current.w - w) > 2 || Math.abs(current.h - h) > 2) {
-        const cx = state.currentCell.x * state.grid.cellWidth;
-        const cy = state.currentCell.y * state.grid.cellHeight;
+        const cx = useCameraStore.getState().currentCell.x * grid.cellWidth;
+        const cy = useCameraStore.getState().currentCell.y * grid.cellHeight;
         updateWindow(windowId, {
           h,
           w,
-          x: cx + (state.grid.cellWidth - w) / 2,
-          y: cy + (state.grid.cellHeight - h) / 2,
+          x: cx + (grid.cellWidth - w) / 2,
+          y: cy + (grid.cellHeight - h) / 2,
         });
       }
     };
@@ -97,14 +96,13 @@ const useWebviewEvents = (
 };
 
 export const Window = ({ windowId }: { windowId: string }) => {
-  const win = useStore((s) => s.windows.find((w) => w.id === windowId));
-  const updateWindow = useStore((s) => s.updateWindow);
-  const activeWindowId = useStore((s) => s.activeWindowId);
-  const setActiveWindow = useStore((s) => s.setActiveWindow);
-  const maximizeWindow = useStore((s) => s.maximizeWindow);
-  const centerOnWindow = useStore((s) => s.centerOnWindow);
-  const bringToFront = useStore((s) => s.bringToFront);
-  const removeWindow = useStore((s) => s.removeWindow);
+  const win = useWindowStore((s) => s.windows.find((w) => w.id === windowId));
+  const updateWindow = useWindowStore((s) => s.updateWindow);
+  const activeWindowId = useWindowStore((s) => s.activeWindowId);
+  const setActiveWindow = useWindowStore((s) => s.setActiveWindow);
+  const maximizeWindow = useWindowStore((s) => s.maximizeWindow);
+  const bringToFront = useWindowStore((s) => s.bringToFront);
+  const removeWindow = useWindowStore((s) => s.removeWindow);
   const webviewRef = useRef<Electron.WebviewTag | null>(null);
   const [blockedCount, setBlockedCount] = useState(0);
 
@@ -133,7 +131,9 @@ export const Window = ({ windowId }: { windowId: string }) => {
 
   useEffect(
     () => () => {
-      const w = useStore.getState().windows.find((x) => x.id === windowId);
+      const w = useWindowStore
+        .getState()
+        .windows.find((x) => x.id === windowId);
       if (w && w.url.startsWith("blob:")) {
         URL.revokeObjectURL(w.url);
       }
@@ -190,7 +190,6 @@ export const Window = ({ windowId }: { windowId: string }) => {
         className={`titlebar flex h-9 items-center justify-between px-2.5 select-none ${
           isActive ? "bg-[#333]" : "bg-[#2a2a2a]"
         } text-[#ddd] cursor-grab`}
-        onDoubleClick={() => centerOnWindow(win.id)}
       >
         <span className="w-10 shrink-0 opacity-50">{win.id.slice(0, 4)}</span>
         <span className="truncate text-center text-sm">{displayName}</span>

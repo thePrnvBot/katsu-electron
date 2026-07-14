@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useStore } from "../store/window-store";
+import { useCameraStore } from "../store/camera-store";
 
 const CELL_SIZE = 14;
 const GAP = 1;
 const HIDE_DELAY = 2500;
 
 export const Minimap = () => {
-  const grid = useStore((s) => s.grid);
-  const currentCell = useStore((s) => s.currentCell);
-  const moveToCell = useStore((s) => s.moveToCell);
+  const grid = useCameraStore((s) => s.grid);
+  const currentCell = useCameraStore((s) => s.currentCell);
+  const moveToCell = useCameraStore((s) => s.moveToCell);
 
   const [hidden, setHidden] = useState(false);
   const [hovered, setHovered] = useState(false);

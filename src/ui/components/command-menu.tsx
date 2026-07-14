@@ -2,7 +2,10 @@ import { Command } from "cmdk";
 import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { useStore } from "../store/window-store";
+import { useCenterOnWindow } from "../hooks/use-center-window";
+import { useCameraStore } from "../store/camera-store";
+import { useSettingsStore } from "../store/settings-store";
+import { useWindowStore } from "../store/window-store";
 
 type CommandPages = "root" | "windows" | "layout" | "settings";
 
@@ -38,9 +41,9 @@ const RootMenu = ({ navigateToPage }: SubMenuProps) => (
 );
 
 const WindowsMenu = ({ closeAndResetMenu }: SubMenuProps) => {
-  const windows = useStore((s) => s.windows);
-  const centerOnWindow = useStore((s) => s.centerOnWindow);
-  const setActiveWindow = useStore((s) => s.setActiveWindow);
+  const windows = useWindowStore((s) => s.windows);
+  const setActiveWindow = useWindowStore((s) => s.setActiveWindow);
+  const centerOnWindow = useCenterOnWindow();
 
   const goToWindow = (id: string) => {
     centerOnWindow(id);
@@ -68,8 +71,8 @@ const WindowsMenu = ({ closeAndResetMenu }: SubMenuProps) => {
 };
 
 const LayoutMenu = ({ closeAndResetMenu }: SubMenuProps) => {
-  const activeWindowId = useStore((s) => s.activeWindowId);
-  const setWindowLayout = useStore((s) => s.setWindowLayout);
+  const activeWindowId = useWindowStore((s) => s.activeWindowId);
+  const setWindowLayout = useWindowStore((s) => s.setWindowLayout);
 
   interface LayoutItem {
     key: string;
@@ -125,9 +128,9 @@ const LayoutMenu = ({ closeAndResetMenu }: SubMenuProps) => {
 };
 
 const SettingsMenu = ({ closeAndResetMenu }: SubMenuProps) => {
-  const settings = useStore((s) => s.settings);
-  const toggleWindowPeeking = useStore((s) => s.toggleWindowPeeking);
-  const refreshGridSize = useStore((s) => s.refreshGridSize);
+  const settings = useSettingsStore((s) => s.settings);
+  const toggleWindowPeeking = useSettingsStore((s) => s.toggleWindowPeeking);
+  const refreshGridSize = useCameraStore((s) => s.refreshGridSize);
 
   return (
     <>

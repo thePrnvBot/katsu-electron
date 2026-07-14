@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 
-import { useStore } from "../store/window-store";
+import { useCameraStore } from "../store/camera-store";
 
 const EPSILON = 0.01;
+const EASE = 0.15;
 
 export const CameraAnimator = () => {
   useEffect(() => {
@@ -10,32 +11,30 @@ export const CameraAnimator = () => {
     let running = false;
 
     const tick = () => {
-      const state = useStore.getState();
+      const state = useCameraStore.getState();
 
       const dx = state.cameraTarget.x - state.camera.x;
       const dy = state.cameraTarget.y - state.camera.y;
 
       if (Math.abs(dx) < EPSILON && Math.abs(dy) < EPSILON) {
-        useStore.setState({
+        useCameraStore.setState({
           camera: { x: state.cameraTarget.x, y: state.cameraTarget.y },
         });
         running = false;
         return;
       }
 
-      const ease = 0.15;
-
-      useStore.setState({
+      useCameraStore.setState({
         camera: {
-          x: state.camera.x + dx * ease,
-          y: state.camera.y + dy * ease,
+          x: state.camera.x + dx * EASE,
+          y: state.camera.y + dy * EASE,
         },
       });
 
       raf = requestAnimationFrame(tick);
     };
 
-    const unsubscribe = useStore.subscribe((state, prev) => {
+    const unsubscribe = useCameraStore.subscribe((state, prev) => {
       if (!running && state.cameraTarget !== prev.cameraTarget) {
         running = true;
         raf = requestAnimationFrame(tick);

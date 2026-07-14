@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 
-import { useStore } from "../store/window-store";
+import { useCameraStore } from "../store/camera-store";
+import { useSettingsStore } from "../store/settings-store";
 
 interface WorldProps {
   children: React.ReactNode;
@@ -8,9 +9,9 @@ interface WorldProps {
 }
 
 export const World = ({ children, onFileDrop }: WorldProps) => {
-  const camera = useStore((s) => s.camera);
-  const grid = useStore((s) => s.grid);
-  const windowPeeking = useStore((s) => s.settings.windowPeeking);
+  const camera = useCameraStore((s) => s.camera);
+  const grid = useCameraStore((s) => s.grid);
+  const windowPeeking = useSettingsStore((s) => s.settings.windowPeeking);
   const [dragOver, setDragOver] = useState(false);
   const dragCounter = useRef(0);
 
