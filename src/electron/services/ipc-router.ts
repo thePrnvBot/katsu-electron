@@ -8,6 +8,7 @@ import * as Schema from "effect/Schema";
 import { app } from "electron";
 
 import { IPCCommand } from "../schemas/ipc-schemas.js";
+import type { WindowMetadata } from "../shared/types.js";
 import { IPCError } from "../shared/types.js";
 
 type CommandHandler = (payload: unknown) => Effect.Effect<unknown, IPCError>;
@@ -57,7 +58,7 @@ export const IPCRouterLive = Layer.succeed(IPCRouter, {
 
 const stateSaveHandler: CommandHandler = (payload) =>
   Effect.gen(function* stateSaveHandlerGen() {
-    const { windows } = payload as { windows: Record<string, unknown>[] };
+    const { windows } = payload as { windows: WindowMetadata[] };
 
     const filePath = getStateFilePath();
     const tmpPath = `${filePath}.tmp`;
