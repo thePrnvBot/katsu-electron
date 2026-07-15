@@ -78,16 +78,12 @@ const normalizeUrl = (value: string): string | null => {
   if (!value) {
     return null;
   }
-  if (value.startsWith("file://")) {
-    return value;
-  }
-  if (value.startsWith("katsu://")) {
-    return value;
-  }
-  if (value.startsWith("http://")) {
-    return `https://${value.slice("http://".length)}`;
-  }
-  if (value.startsWith("https://")) {
+  if (
+    value.startsWith("file://") ||
+    value.startsWith("katsu://") ||
+    value.startsWith("http://") ||
+    value.startsWith("https://")
+  ) {
     return value;
   }
   return `https://${value}`;
