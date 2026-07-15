@@ -9,6 +9,7 @@ import { app } from "electron";
 
 import { PersistenceError } from "../shared/errors/persistence-error.js";
 import type { WindowMetadata } from "../shared/types.js";
+import { getUserData } from "../util.js";
 
 const BoundsSchema = Schema.Struct({
   height: Schema.Number,
@@ -35,19 +36,15 @@ export interface Persistence {
   readonly saveState: (
     windows: readonly WindowMetadata[]
   ) => Effect.Effect<void, PersistenceError>;
-  readonly getStatePath: Effect.Effect<string>;
 }
 
 export const Persistence = Context.GenericTag<Persistence>("Persistence");
 
-const getStateFilePath = (): string =>
-  path.join(app.getPath("userData"), "windows.json");
+const StateFilePath: string = getUserData("windows.json");
 
 export const PersistenceLive = Layer.succeed(Persistence, {
-  getStatePath: Effect.sync(getStateFilePath),
-
   loadState: Effect.gen(function* loadState() {
-    const filePath = getStateFilePath();
+    const filePath = StateFilePath;
     try {
       const content = yield* Effect.tryPromise({
         catch: (err) => new PersistenceError("ReadFailed", err),
@@ -68,7 +65,7 @@ export const PersistenceLive = Layer.succeed(Persistence, {
 
   saveState: (windows: readonly WindowMetadata[]) =>
     Effect.gen(function* saveState() {
-      const filePath = getStateFilePath();
+      const filePath = StateFilePath;
       const tmpPath = `${filePath}.tmp`;
       const content = JSON.stringify(windows, null, 2);
 

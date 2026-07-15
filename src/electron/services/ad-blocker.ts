@@ -6,6 +6,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { app } from "electron";
 
+import { getUserData } from "../util.js";
+
 const FILTER_LISTS = [
   {
     file: "ublock-filters.txt",
@@ -37,7 +39,7 @@ const TYPE_MAP: Record<string, string> = {
   xhr: "xmlhttprequest",
 };
 
-const CACHE_FILE = path.join(app.getPath("userData"), "adblock-cache.json");
+const CACHE_FILE = getUserData("adblock-cache.json");
 const FILTERS_DIR = path.join(app.getAppPath(), "dist-electron", "filters");
 
 export interface AdBlocker {

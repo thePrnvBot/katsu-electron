@@ -10,6 +10,7 @@ import { app } from "electron";
 import { IPCCommand } from "../schemas/ipc-schemas.js";
 import type { WindowMetadata } from "../shared/types.js";
 import { IPCError } from "../shared/types.js";
+import { getUserData } from "../util.js";
 
 type CommandHandler = (payload: unknown) => Effect.Effect<unknown, IPCError>;
 
@@ -27,11 +28,9 @@ export const IPCRouter = Context.GenericTag<IPCRouter>("IPCRouter");
 
 const handlers = new Map<string, CommandHandler>();
 
-const getStateFilePath = (): string =>
-  path.join(app.getPath("userData"), "windows.json");
+const StateFilePath: string = getUserData("windows.json");
 
-const getSettingsFilePath = (): string =>
-  path.join(app.getPath("userData"), "settings.json");
+const SettingsFilePath: string = getUserData("settings.json");
 
 export const IPCRouterLive = Layer.succeed(IPCRouter, {
   handleCommand: (command: unknown) =>
@@ -60,7 +59,7 @@ const stateSaveHandler: CommandHandler = (payload) =>
   Effect.gen(function* stateSaveHandlerGen() {
     const { windows } = payload as { windows: WindowMetadata[] };
 
-    const filePath = getStateFilePath();
+    const filePath = StateFilePath;
     const tmpPath = `${filePath}.tmp`;
     const content = JSON.stringify(windows, null, 2);
 
@@ -90,7 +89,7 @@ const settingsSaveHandler: CommandHandler = (payload) =>
       settings: { windowPeeking: boolean };
     };
 
-    const filePath = getSettingsFilePath();
+    const filePath = SettingsFilePath;
     const tmpPath = `${filePath}.tmp`;
     const content = JSON.stringify(settings, null, 2);
 

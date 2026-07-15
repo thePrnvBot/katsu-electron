@@ -9,10 +9,10 @@ import { MainLayer } from "../layers/main-layer.js";
 import { IPCRouter } from "../services/ipc-router.js";
 import { Persistence } from "../services/persistence.js";
 import type { WindowMetadata } from "../shared/types.js";
+import { getUserData } from "../util.js";
 import { getMainWindow } from "../window-manager.js";
 
-const SETTINGS_PATH = (): string =>
-  path.join(app.getPath("userData"), "settings.json");
+const SETTINGS_PATH = getUserData("settings.json");
 
 export const registerIpcHandlers = (): void => {
   // Unified command router
@@ -62,7 +62,7 @@ export const registerIpcHandlers = (): void => {
   // Settings: load
   ipcMain.handle("settings:load", async () => {
     try {
-      const content = await fs.readFile(SETTINGS_PATH(), "utf-8");
+      const content = await fs.readFile(SETTINGS_PATH, "utf-8");
       return JSON.parse(content);
     } catch {
       return { windowPeeking: false };
