@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import type { PreviewType } from "../utils/file-preview";
 import { revokeBlobUrl } from "../utils/file-preview";
 import type { WindowLayout } from "../utils/window-layouts";
 import { resolveLayout } from "../utils/window-layouts";
@@ -23,6 +24,7 @@ export interface Window {
   readonly fileName?: string;
   readonly maximized?: boolean;
   readonly prevBounds?: Bounds;
+  readonly previewType?: PreviewType;
 }
 
 interface WindowState {

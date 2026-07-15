@@ -28,3 +28,13 @@ export const VIDEO_EXTENSIONS = new Set([
   "mkv",
   "avi",
 ]);
+
+export const AUDIO_EXTENSIONS = new Set([
+  "mp3",
+  "wav",
+  "ogg",
+  "aac",
+  "flac",
+  "m4a",
+  "wma",
+]);
