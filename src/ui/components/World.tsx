@@ -70,7 +70,9 @@ export const World = ({ children, onFileDrop }: WorldProps) => {
         style={{
           height: worldH,
           top: 32,
-          transform: `translate3d(${-camera.x}px, ${-camera.y}px, 0)${windowPeeking ? " scale(0.9)" : ""}`,
+          transform: windowPeeking
+            ? `translate3d(${-camera.x * 0.9}px, ${-camera.y * 0.9}px, 0) scale(0.9)`
+            : `translate3d(${-camera.x}px, ${-camera.y}px, 0)`,
           transformOrigin: "0 0",
           width: worldW,
         }}
