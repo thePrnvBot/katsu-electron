@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export interface Settings {
+interface Settings {
   readonly windowPeeking: boolean;
 }
 

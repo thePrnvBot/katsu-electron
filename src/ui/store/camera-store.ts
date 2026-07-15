@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 import { GRID_COLS, GRID_ROWS } from "../lib/constants";
 
-export interface Grid {
+interface Grid {
   readonly cols: number;
   readonly rows: number;
   readonly cellWidth: number;

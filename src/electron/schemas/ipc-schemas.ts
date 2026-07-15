@@ -1,13 +1,13 @@
 import * as Schema from "effect/Schema";
 
-export const BoundsSchema = Schema.Struct({
+const BoundsSchema = Schema.Struct({
   height: Schema.Number.pipe(Schema.positive()),
   width: Schema.Number.pipe(Schema.positive()),
   x: Schema.Number,
   y: Schema.Number,
 });
 
-export const WindowMetadataSchema = Schema.Struct({
+const WindowMetadataSchema = Schema.Struct({
   bounds: BoundsSchema,
   id: Schema.String,
   title: Schema.optional(Schema.String),
@@ -15,24 +15,24 @@ export const WindowMetadataSchema = Schema.Struct({
   zIndex: Schema.Number.pipe(Schema.int()),
 });
 
-export const DialogOpenFileCommand = Schema.Struct({
+const DialogOpenFileCommand = Schema.Struct({
   payload: Schema.Struct({}),
   type: Schema.Literal("dialog:openFile"),
 });
 
-export const StateLoadCommand = Schema.Struct({
+const StateLoadCommand = Schema.Struct({
   payload: Schema.Struct({}),
   type: Schema.Literal("state:load"),
 });
 
-export const StateSaveCommand = Schema.Struct({
+const StateSaveCommand = Schema.Struct({
   payload: Schema.Struct({
     windows: Schema.Array(WindowMetadataSchema),
   }),
   type: Schema.Literal("state:save"),
 });
 
-export const SettingsSaveCommand = Schema.Struct({
+const SettingsSaveCommand = Schema.Struct({
   payload: Schema.Struct({
     settings: Schema.Struct({
       windowPeeking: Schema.Boolean,
@@ -41,7 +41,7 @@ export const SettingsSaveCommand = Schema.Struct({
   type: Schema.Literal("settings:save"),
 });
 
-export const WindowControlCommand = Schema.Struct({
+const WindowControlCommand = Schema.Struct({
   payload: Schema.Union(
     Schema.Literal("minimize"),
     Schema.Literal("maximize"),
@@ -50,7 +50,7 @@ export const WindowControlCommand = Schema.Struct({
   type: Schema.Literal("window:control"),
 });
 
-export const PermissionRespondCommand = Schema.Struct({
+const PermissionRespondCommand = Schema.Struct({
   payload: Schema.Struct({
     granted: Schema.Boolean,
     requestId: Schema.String,
@@ -68,14 +68,3 @@ export const IPCCommand = Schema.Union(
 );
 
 export type IPCCommand = typeof IPCCommand.Type;
-
-export const IPCResponse = Schema.Union(
-  Schema.Struct({ data: Schema.Unknown, success: Schema.Literal(true) }),
-  Schema.Struct({
-    details: Schema.optional(Schema.Unknown),
-    error: Schema.String,
-    success: Schema.Literal(false),
-  })
-);
-
-export type IPCResponse = typeof IPCResponse.Type;
