@@ -12,7 +12,7 @@ import { IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "./lib/constants";
 import { useCameraStore } from "./store/camera-store";
 import { useSettingsStore } from "./store/settings-store";
 import { useWindowStore } from "./store/window-store";
-import { createFilePreview } from "./utils/file-preview";
+import { createFilePreview, getPreviewType } from "./utils/file-preview";
 import { computeWindowSize } from "./utils/layout";
 
 const getMediaDimensions = (
@@ -112,6 +112,9 @@ export default function App() {
             fileName: win.title as string | undefined,
             h: bounds?.height ?? 400,
             id: win.id as string,
+            previewType: win.previewType as
+              | ReturnType<typeof getPreviewType>
+              | undefined,
             url: win.url as string,
             w: bounds?.width ?? 600,
             x: bounds?.x ?? 100,
@@ -143,6 +146,7 @@ export default function App() {
       const metadata = currentWindows.map((w) => ({
         bounds: { height: w.h, width: w.w, x: w.x, y: w.y },
         id: w.id,
+        previewType: w.previewType,
         title: w.fileName,
         url: w.url,
         zIndex: w.z ?? 1,
@@ -228,7 +232,7 @@ export default function App() {
     const previews = await Promise.all(files.map(createFilePreview));
 
     for (const preview of previews) {
-      const { url, fileName, nativeWidth, nativeHeight } = preview;
+      const { url, fileName, nativeWidth, nativeHeight, previewType } = preview;
       const newWindowId = crypto.randomUUID();
       const { w, h } = computeWindowSize(
         nativeWidth,
@@ -241,6 +245,7 @@ export default function App() {
         fileName,
         h,
         id: newWindowId,
+        previewType,
         url,
         w,
         x: currentCell.x * grid.cellWidth + (grid.cellWidth - w) / 2,
@@ -258,16 +263,29 @@ export default function App() {
         result.filePaths.map(async (filePath) => {
           const fileName = filePath.split(/[/\\]/u).pop() ?? filePath;
           const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+          const previewType = getPreviewType("", fileName);
           const rawUrl = `katsu://preview/${encodeURIComponent(filePath)}?raw`;
-          const { w: nativeW, h: nativeH } = await getMediaDimensions(
-            rawUrl,
-            ext
-          );
-          return { ext, fileName, filePath, nativeH, nativeW };
+
+          let nativeW: number | undefined;
+          let nativeH: number | undefined;
+
+          if (previewType === "image" || previewType === "video") {
+            const dims = await getMediaDimensions(rawUrl, ext);
+            nativeW = dims.w || undefined;
+            nativeH = dims.h || undefined;
+          }
+
+          return { fileName, nativeH, nativeW, previewType, rawUrl };
         })
       );
 
-      for (const { filePath, fileName, nativeH, nativeW } of fileData) {
+      for (const {
+        fileName,
+        nativeH,
+        nativeW,
+        previewType,
+        rawUrl,
+      } of fileData) {
         const { w, h } = computeWindowSize(
           nativeW,
           nativeH,
@@ -280,7 +298,8 @@ export default function App() {
           fileName,
           h,
           id: newWindowId,
-          url: `katsu://preview/${encodeURIComponent(filePath)}`,
+          previewType,
+          url: rawUrl,
           w,
           x: currentCell.x * grid.cellWidth + (grid.cellWidth - w) / 2,
           y: currentCell.y * grid.cellHeight + (grid.cellHeight - h) / 2,

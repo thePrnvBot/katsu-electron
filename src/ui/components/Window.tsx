@@ -4,8 +4,10 @@ import { Rnd } from "react-rnd";
 
 import { useCameraStore } from "../store/camera-store";
 import { useWindowStore } from "../store/window-store";
+import type { Window as WindowData } from "../store/window-store";
 import { computeWindowSize } from "../utils/layout";
 import { ErrorOverlay } from "./error-overlay";
+import { FilePreview } from "./file-preview";
 
 const isWebUrl = (url: string) =>
   url.length > 0 && !url.startsWith("katsu://") && !url.startsWith("blob:");
@@ -93,6 +95,83 @@ const useWebviewEvents = (
   }, [windowId, updateWindow, webviewRef]);
 
   return loadError;
+};
+
+const WindowBody = ({
+  loadError,
+  webviewRef,
+  win,
+  windowId,
+}: {
+  loadError: string | null;
+  webviewRef: React.RefObject<Electron.WebviewTag | null>;
+  win: WindowData;
+  windowId: string;
+}) => {
+  const isComponentPreview = win.previewType && win.previewType !== "pdf";
+
+  return (
+    <div
+      style={{
+        background: "#0f0f0f",
+        flex: 1,
+        minHeight: 0,
+        position: "relative",
+      }}
+    >
+      {isComponentPreview && !loadError && (
+        <FilePreview
+          fileName={win.fileName ?? ""}
+          previewType={win.previewType}
+          url={win.url}
+          windowId={windowId}
+        />
+      )}
+      {!isComponentPreview && win.url && !loadError && (
+        <webview
+          ref={webviewRef as React.RefObject<Electron.WebviewTag>}
+          src={win.url}
+          style={{
+            border: "none",
+            height: "100%",
+            left: 0,
+            position: "absolute",
+            top: 0,
+            width: "100%",
+          }}
+          preload={window.electronAPI.getWebviewPreloadPath()}
+          partition="persist:katsu"
+        />
+      )}
+      {loadError && (
+        <ErrorOverlay
+          error={loadError}
+          url={win.url}
+          onRetry={() => {
+            const webview = webviewRef.current;
+            if (webview) {
+              webview.reload();
+            }
+          }}
+        />
+      )}
+      {!win.url && !loadError && (
+        <div
+          style={{
+            alignItems: "center",
+            color: "#777",
+            display: "flex",
+            inset: 0,
+            justifyContent: "center",
+            padding: 12,
+            position: "absolute",
+          }}
+        >
+          Empty window
+        </div>
+      )}
+    </div>
+  );
 };
 
 export const Window = ({ windowId }: { windowId: string }) => {
@@ -232,58 +311,12 @@ export const Window = ({ windowId }: { windowId: string }) => {
         </div>
       </div>
 
-      <div
-        style={{
-          background: "#0f0f0f",
-          flex: 1,
-          minHeight: 0,
-          position: "relative",
-        }}
-      >
-        {win.url && !loadError && (
-          <webview
-            ref={webviewRef as React.RefObject<Electron.WebviewTag>}
-            src={win.url}
-            style={{
-              border: "none",
-              height: "100%",
-              left: 0,
-              position: "absolute",
-              top: 0,
-              width: "100%",
-            }}
-            preload={window.electronAPI.getWebviewPreloadPath()}
-            partition="persist:katsu"
-          />
-        )}
-        {loadError && (
-          <ErrorOverlay
-            url={win.url}
-            error={loadError}
-            onRetry={() => {
-              const webview = webviewRef.current;
-              if (webview) {
-                webview.reload();
-              }
-            }}
-          />
-        )}
-        {!win.url && !loadError && (
-          <div
-            style={{
-              alignItems: "center",
-              color: "#777",
-              display: "flex",
-              inset: 0,
-              justifyContent: "center",
-              padding: 12,
-              position: "absolute",
-            }}
-          >
-            Empty window
-          </div>
-        )}
-      </div>
+      <WindowBody
+        loadError={loadError}
+        webviewRef={webviewRef}
+        win={win}
+        windowId={windowId}
+      />
     </Rnd>
   );
 };
