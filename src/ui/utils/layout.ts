@@ -1,4 +1,4 @@
-import { TITLEBAR_HEIGHT, WINDOW_BORDER } from "../lib/constants";
+import { WINDOW_BORDER, WINDOW_TITLEBAR_HEIGHT } from "../lib/constants";
 
 export interface Size {
   readonly h: number;
@@ -16,7 +16,7 @@ export const computeWindowSize = (
   cellHeight: number
 ): Size => {
   const contentMaxW = cellWidth * 0.9 - WINDOW_BORDER;
-  const contentMaxH = cellHeight * 0.9 - WINDOW_BORDER - TITLEBAR_HEIGHT;
+  const contentMaxH = cellHeight * 0.9 - WINDOW_BORDER - WINDOW_TITLEBAR_HEIGHT;
 
   if (nativeWidth && nativeHeight) {
     const scale = Math.min(
@@ -25,7 +25,10 @@ export const computeWindowSize = (
       1
     );
     return {
-      h: Math.round(nativeHeight * scale) + WINDOW_BORDER + TITLEBAR_HEIGHT,
+      h:
+        Math.round(nativeHeight * scale) +
+        WINDOW_BORDER +
+        WINDOW_TITLEBAR_HEIGHT,
       w: Math.round(nativeWidth * scale) + WINDOW_BORDER,
     };
   }
@@ -33,7 +36,7 @@ export const computeWindowSize = (
   const defaultW = 700;
   const defaultH = 500;
   return {
-    h: Math.min(defaultH, contentMaxH) + WINDOW_BORDER + TITLEBAR_HEIGHT,
+    h: Math.min(defaultH, contentMaxH) + WINDOW_BORDER + WINDOW_TITLEBAR_HEIGHT,
     w: Math.min(defaultW, contentMaxW) + WINDOW_BORDER,
   };
 };

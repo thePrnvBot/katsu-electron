@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 
+import { APP_TITLEBAR_HEIGHT } from "../lib/constants";
 import { useCameraStore } from "../store/camera-store";
 import { useSettingsStore } from "../store/settings-store";
 
@@ -69,7 +70,7 @@ export const World = ({ children, onFileDrop }: WorldProps) => {
         className="absolute left-0"
         style={{
           height: worldH,
-          top: 32,
+          top: APP_TITLEBAR_HEIGHT,
           transform: windowPeeking
             ? `translate3d(${-camera.x * 0.9}px, ${-camera.y * 0.9}px, 0) scale(0.9)`
             : `translate3d(${-camera.x}px, ${-camera.y}px, 0)`,

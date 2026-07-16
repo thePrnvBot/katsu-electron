@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { GRID_COLS, GRID_ROWS } from "../lib/constants";
+import { APP_TITLEBAR_HEIGHT, GRID_COLS, GRID_ROWS } from "../lib/constants";
 
 interface Grid {
   readonly cols: number;
@@ -27,7 +27,10 @@ export const useCameraStore = create<CameraState>((set, get) => ({
   cameraTarget: { x: 0, y: 0 },
   currentCell: { x: 0, y: 0 },
   grid: {
-    cellHeight: typeof window === "undefined" ? 900 : window.innerHeight,
+    cellHeight:
+      typeof window === "undefined"
+        ? 900 - APP_TITLEBAR_HEIGHT
+        : window.innerHeight - APP_TITLEBAR_HEIGHT,
     cellWidth: typeof window === "undefined" ? 1400 : window.innerWidth,
     cols: GRID_COLS,
     rows: GRID_ROWS,
@@ -53,7 +56,7 @@ export const useCameraStore = create<CameraState>((set, get) => ({
   refreshGridSize: () =>
     set((s) => {
       const cellWidth = window.innerWidth;
-      const cellHeight = window.innerHeight;
+      const cellHeight = window.innerHeight - APP_TITLEBAR_HEIGHT;
       const cx = s.currentCell.x * cellWidth;
       const cy = s.currentCell.y * cellHeight;
       return {

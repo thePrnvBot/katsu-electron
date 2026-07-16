@@ -1,7 +1,8 @@
 export const GRID_COLS = 10;
 export const GRID_ROWS = 10;
 
-export const TITLEBAR_HEIGHT = 36;
+export const APP_TITLEBAR_HEIGHT = 32;
+export const WINDOW_TITLEBAR_HEIGHT = 36;
 export const WINDOW_BORDER = 4;
 
 export const IMAGE_EXTENSIONS = new Set([

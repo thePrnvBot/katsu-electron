@@ -41,8 +41,10 @@ const WindowBody = ({
           windowId={windowId}
         />
       )}
-      {!isComponentPreview && win.url && !loadError && (
-        win.previewType === "pdf" ? (
+      {!isComponentPreview &&
+        win.url &&
+        !loadError &&
+        (win.previewType === "pdf" ? (
           <iframe
             src={win.url}
             style={{
@@ -70,8 +72,7 @@ const WindowBody = ({
             preload={window.electronAPI.getWebviewPreloadPath()}
             partition="persist:katsu"
           />
-        )
-      )}
+        ))}
       {loadError && (
         <ErrorOverlay
           error={loadError}
