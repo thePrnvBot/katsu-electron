@@ -15,14 +15,8 @@ const handleMaximize = () =>
   });
 
 export const TitleBar = () => (
-  <div
-    className="fixed top-0 left-0 right-0 z-50 flex h-8 items-center bg-[#1a1a1a]"
-    style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
-  >
-    <div
-      className="ml-3 flex gap-2"
-      style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-    >
+  <div className="app-region-drag fixed top-0 left-0 right-0 z-50 flex h-8 items-center bg-[#1a1a1a]">
+    <div className="app-region-no-drag ml-3 flex gap-2">
       <button
         type="button"
         onClick={handleClose}

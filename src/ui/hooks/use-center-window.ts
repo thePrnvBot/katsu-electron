@@ -4,13 +4,12 @@ import { useCameraStore } from "../store/camera-store";
 import { useWindowStore } from "../store/window-store";
 
 export const useCenterOnWindow = () => {
-  const windows = useWindowStore((s) => s.windows);
   const setActiveWindow = useWindowStore((s) => s.setActiveWindow);
   const moveToCell = useCameraStore((s) => s.moveToCell);
 
   return useCallback(
     (id: string) => {
-      const w = windows.find((x) => x.id === id);
+      const w = useWindowStore.getState().windows.find((x) => x.id === id);
       if (!w) {
         return;
       }
@@ -22,6 +21,6 @@ export const useCenterOnWindow = () => {
       moveToCell(cx, cy);
       setActiveWindow(id);
     },
-    [windows, moveToCell, setActiveWindow]
+    [moveToCell, setActiveWindow]
   );
 };

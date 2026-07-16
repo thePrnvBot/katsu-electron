@@ -25,3 +25,11 @@ body {
   background: var(--bg);
   color: var(--fg);
 }
+
+.app-region-drag {
+  -webkit-app-region: drag;
+}
+
+.app-region-no-drag {
+  -webkit-app-region: no-drag;
+}

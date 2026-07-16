@@ -11,22 +11,27 @@ import { World } from "./components/world";
 import { useCameraStore } from "./store/camera-store";
 import { useSettingsStore } from "./store/settings-store";
 import { useWindowStore } from "./store/window-store";
-import { createFilePreview, type PreviewType } from "./utils/file-preview";
+import { createFilePreview } from "./utils/file-preview";
+import type { PreviewType } from "./utils/file-preview";
 import { computeWindowSize } from "./utils/layout";
+
+const KNOWN_SCHEMES = ["file://", "katsu://", "http://", "https://"] as const;
 
 const normalizeUrl = (value: string): string | null => {
   if (!value) {
     return null;
   }
-  if (
-    value.startsWith("file://") ||
-    value.startsWith("katsu://") ||
-    value.startsWith("http://") ||
-    value.startsWith("https://")
-  ) {
+  if (KNOWN_SCHEMES.some((s) => value.startsWith(s))) {
     return value;
   }
   return `https://${value}`;
+};
+
+const ARROW_DELTAS: Record<string, [number, number]> = {
+  ArrowDown: [0, 1],
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
 };
 
 export default function App() {
@@ -126,22 +131,19 @@ export default function App() {
       if ((e.target as HTMLElement).closest("[cmdk-root]")) {
         return;
       }
-      if (e.key === "ArrowRight") {
-        moveCell(1, 0);
-      }
-      if (e.key === "ArrowLeft") {
-        moveCell(-1, 0);
-      }
-      if (e.key === "ArrowDown") {
-        moveCell(0, 1);
-      }
-      if (e.key === "ArrowUp") {
-        moveCell(0, -1);
+      const delta = ARROW_DELTAS[e.key];
+      if (delta) {
+        moveCell(...delta);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [moveCell]);
+
+  const activateWindow = (id: string) => {
+    setActiveWindow(id);
+    bringToFront(id);
+  };
 
   const openWindow = (cleanUrl: string) => {
     const newWindowId = crypto.randomUUID();
@@ -153,8 +155,7 @@ export default function App() {
       x: currentCell.x * grid.cellWidth + 100 + Math.random() * 50,
       y: currentCell.y * grid.cellHeight + 100 + Math.random() * 50,
     });
-    setActiveWindow(newWindowId);
-    bringToFront(newWindowId);
+    activateWindow(newWindowId);
   };
 
   const openSite = () => {
@@ -189,8 +190,7 @@ export default function App() {
         x: currentCell.x * grid.cellWidth + (grid.cellWidth - w) / 2,
         y: currentCell.y * grid.cellHeight + (grid.cellHeight - h) / 2,
       });
-      setActiveWindow(newWindowId);
-      bringToFront(newWindowId);
+      activateWindow(newWindowId);
     }
   };
 
