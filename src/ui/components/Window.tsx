@@ -215,14 +215,14 @@ export const Window = ({ windowId }: { windowId: string }) => {
           <button
             type="button"
             onClick={() => maximizeWindow(win.id)}
-            className="flex h-5.5 w-5.5 items-center justify-center text-[#aaa]"
+            className="flex h-5.5 w-5.5 items-center justify-center rounded-md text-[#aaa] transition hover:scale-105 hover:bg-white/10 hover:text-white"
           >
             <Maximize size={14} />
           </button>
           <button
             type="button"
             onClick={() => removeWindow(win.id)}
-            className="flex h-5.5 w-5.5 items-center justify-center text-[#aaa]"
+            className="flex h-5.5 w-5.5 items-center justify-center rounded-md text-[#aaa] transition hover:scale-105 hover:bg-red-500/20 hover:text-red-400"
           >
             <X size={14} />
           </button>
