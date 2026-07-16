@@ -1,38 +1,30 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
+import { useAutoHide } from "../hooks/use-auto-hide";
 import { useCameraStore } from "../store/camera-store";
 
 const CELL_SIZE = 14;
 const GAP = 1;
-const HIDE_DELAY = 2500;
 
 export const Minimap = () => {
   const grid = useCameraStore((s) => s.grid);
   const currentCell = useCameraStore((s) => s.currentCell);
   const moveToCell = useCameraStore((s) => s.moveToCell);
 
-  const [hidden, setHidden] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const timer = useRef<number | null>(null);
+  const { hidden, show, startHideTimer } = useAutoHide(hovered);
 
-  const startHideTimer = useCallback(() => {
-    if (timer.current) {
-      clearTimeout(timer.current);
-    }
-    timer.current = window.setTimeout(() => {
-      if (!hovered) {
-        setHidden(true);
-      }
-    }, HIDE_DELAY);
-  }, [hovered]);
+  const handleMouseEnter = () => {
+    setHovered(true);
+    show();
+  };
 
-  const show = useCallback(() => {
-    setHidden(false);
+  const handleMouseLeave = () => {
+    setHovered(false);
     startHideTimer();
-  }, [startHideTimer]);
+  };
 
   useEffect(() => {
-    startHideTimer();
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest("[cmdk-root]")) {
         return;
@@ -47,23 +39,8 @@ export const Minimap = () => {
       }
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => {
-      if (timer.current) {
-        clearTimeout(timer.current);
-      }
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [show, startHideTimer]);
-
-  const handleMouseEnter = () => {
-    setHovered(true);
-    setHidden(false);
-  };
-
-  const handleMouseLeave = () => {
-    setHovered(false);
-    startHideTimer();
-  };
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [show]);
 
   const w = grid.cols * (CELL_SIZE + GAP);
   const h = grid.rows * (CELL_SIZE + GAP);

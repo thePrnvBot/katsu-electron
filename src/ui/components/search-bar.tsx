@@ -1,7 +1,7 @@
 import { ArrowRight, FileUp } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-const HIDE_DELAY = 2500;
+import { useAutoHide } from "../hooks/use-auto-hide";
 
 interface SearchBarProps {
   url: string;
@@ -16,34 +16,8 @@ export const SearchBar = ({
   openSite,
   onOpenFileDialog,
 }: SearchBarProps) => {
-  const [hidden, setHidden] = useState(false);
   const [focused, setFocused] = useState(false);
-  const timer = useRef<number | null>(null);
-
-  const startHideTimer = useCallback(() => {
-    if (timer.current) {
-      clearTimeout(timer.current);
-    }
-    timer.current = window.setTimeout(() => {
-      if (!focused) {
-        setHidden(true);
-      }
-    }, HIDE_DELAY);
-  }, [focused]);
-
-  const show = () => {
-    setHidden(false);
-    startHideTimer();
-  };
-
-  useEffect(() => {
-    startHideTimer();
-    return () => {
-      if (timer.current) {
-        window.clearTimeout(timer.current);
-      }
-    };
-  }, [startHideTimer]);
+  const { hidden, show, startHideTimer } = useAutoHide(focused);
 
   const visible = !(hidden && !focused);
 
@@ -67,7 +41,7 @@ export const SearchBar = ({
           }}
           onFocus={() => {
             setFocused(true);
-            setHidden(false);
+            show();
           }}
           onBlur={() => {
             setFocused(false);

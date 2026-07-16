@@ -2,100 +2,14 @@ import { Maximize, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
 
-import { useCameraStore } from "../store/camera-store";
+import { useWebviewEvents } from "../hooks/use-webview-events";
 import { useWindowStore } from "../store/window-store";
 import type { Window as WindowData } from "../store/window-store";
-import { computeWindowSize } from "../utils/layout";
 import { ErrorOverlay } from "./error-overlay";
 import { FilePreview } from "./file-preview";
 
 const isWebUrl = (url: string) =>
   url.length > 0 && !url.startsWith("katsu://") && !url.startsWith("blob:");
-
-const useWebviewEvents = (
-  windowId: string,
-  webviewRef: React.RefObject<Electron.WebviewTag | null>,
-  updateWindow: (id: string, patch: Record<string, unknown>) => void
-) => {
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const webview = webviewRef.current;
-    if (!webview) {
-      return;
-    }
-
-    const handleTitle = (e: { title: string }) => {
-      updateWindow(windowId, { fileName: e.title });
-    };
-
-    const handleError = (e: {
-      isMainFrame: boolean;
-      errorCode: number;
-      errorDescription: string;
-    }) => {
-      if (!e.isMainFrame) {
-        return;
-      }
-      setLoadError(e.errorDescription || `Error ${e.errorCode}`);
-    };
-
-    const handleDidStartLoading = () => {
-      setLoadError(null);
-    };
-
-    const handleWebviewMessage = (e: { channel: string; args: unknown[] }) => {
-      if (e.channel !== "webview:message") {
-        return;
-      }
-      const msg = e.args[0] as
-        | { type?: string; w?: number; h?: number }
-        | undefined;
-      if (!msg || msg.type !== "media-dimensions" || !msg.w || !msg.h) {
-        return;
-      }
-
-      const { windows } = useWindowStore.getState();
-      const current = windows.find((x) => x.id === windowId);
-      if (!current || current.maximized) {
-        return;
-      }
-
-      const { grid } = useCameraStore.getState();
-      const { w, h } = computeWindowSize(
-        msg.w,
-        msg.h,
-        grid.cellWidth,
-        grid.cellHeight
-      );
-
-      if (Math.abs(current.w - w) > 2 || Math.abs(current.h - h) > 2) {
-        const cx = useCameraStore.getState().currentCell.x * grid.cellWidth;
-        const cy = useCameraStore.getState().currentCell.y * grid.cellHeight;
-        updateWindow(windowId, {
-          h,
-          w,
-          x: cx + (grid.cellWidth - w) / 2,
-          y: cy + (grid.cellHeight - h) / 2,
-        });
-      }
-    };
-
-    webview.addEventListener("page-title-updated", handleTitle);
-    webview.addEventListener("did-fail-load", handleError);
-    webview.addEventListener("did-start-loading", handleDidStartLoading);
-    webview.addEventListener("ipc-message", handleWebviewMessage);
-
-    return () => {
-      webview.removeEventListener("page-title-updated", handleTitle);
-      webview.removeEventListener("did-fail-load", handleError);
-      webview.removeEventListener("did-start-loading", handleDidStartLoading);
-      webview.removeEventListener("ipc-message", handleWebviewMessage);
-    };
-  }, [windowId, updateWindow, webviewRef]);
-
-  return loadError;
-};
 
 const WindowBody = ({
   loadError,
@@ -128,20 +42,35 @@ const WindowBody = ({
         />
       )}
       {!isComponentPreview && win.url && !loadError && (
-        <webview
-          ref={webviewRef as React.RefObject<Electron.WebviewTag>}
-          src={win.url}
-          style={{
-            border: "none",
-            height: "100%",
-            left: 0,
-            position: "absolute",
-            top: 0,
-            width: "100%",
-          }}
-          preload={window.electronAPI.getWebviewPreloadPath()}
-          partition="persist:katsu"
-        />
+        win.previewType === "pdf" ? (
+          <iframe
+            src={win.url}
+            style={{
+              border: "none",
+              height: "100%",
+              left: 0,
+              position: "absolute",
+              top: 0,
+              width: "100%",
+            }}
+            title={win.fileName || "PDF Preview"}
+          />
+        ) : (
+          <webview
+            ref={webviewRef as React.RefObject<Electron.WebviewTag>}
+            src={win.url}
+            style={{
+              border: "none",
+              height: "100%",
+              left: 0,
+              position: "absolute",
+              top: 0,
+              width: "100%",
+            }}
+            preload={window.electronAPI.getWebviewPreloadPath()}
+            partition="persist:katsu"
+          />
+        )
       )}
       {loadError && (
         <ErrorOverlay
@@ -186,7 +115,7 @@ export const Window = ({ windowId }: { windowId: string }) => {
   const [blockedCount, setBlockedCount] = useState(0);
 
   const showAdPill = isWebUrl(win?.url ?? "");
-  const loadError = useWebviewEvents(windowId, webviewRef, updateWindow);
+  const loadError = useWebviewEvents(windowId, webviewRef);
 
   useEffect(() => {
     if (!showAdPill) {
