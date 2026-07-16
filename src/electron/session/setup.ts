@@ -2,6 +2,7 @@ import path from "node:path";
 
 import * as Effect from "effect/Effect";
 import { app, protocol, session } from "electron";
+import type { BrowserWindow } from "electron";
 
 import { MainLayer } from "../layers/main-layer.js";
 import { AdBlocker } from "../services/ad-blocker.js";
@@ -138,6 +139,19 @@ export const setupWebContentsListeners = (): void => {
   });
 };
 
+const sendOrDefault = async <T>(
+  win: BrowserWindow,
+  channel: string,
+  loader: () => Promise<T>,
+  fallback: T
+): Promise<void> => {
+  try {
+    win.webContents.send(channel, await loader());
+  } catch {
+    win.webContents.send(channel, fallback);
+  }
+};
+
 export const sendInitialState = async (): Promise<void> => {
   const win = getMainWindow();
   if (!win) {
@@ -153,33 +167,35 @@ export const sendInitialState = async (): Promise<void> => {
     ),
   });
 
-  try {
-    const savedWindows = await Effect.runPromise(
-      Effect.gen(function* program() {
-        const persistence = yield* Persistence;
-        return yield* persistence.loadState;
-      }).pipe(Effect.provide(MainLayer))
-    );
-    win.webContents.send("state:loaded", savedWindows);
-  } catch {
-    win.webContents.send("state:loaded", []);
-  }
+  await sendOrDefault(
+    win,
+    "state:loaded",
+    () =>
+      Effect.runPromise(
+        Effect.gen(function* program() {
+          const persistence = yield* Persistence;
+          return yield* persistence.loadState;
+        }).pipe(Effect.provide(MainLayer))
+      ),
+    []
+  );
 
-  try {
-    const content = await Effect.runPromise(
-      Effect.tryPromise({
-        catch: () => new Error("read failed"),
-        try: () =>
-          import("node:fs/promises").then((fs) =>
-            fs.readFile(
-              path.join(app.getPath("userData"), "settings.json"),
-              "utf-8"
-            )
-          ),
-      })
-    );
-    win.webContents.send("settings:loaded", JSON.parse(content));
-  } catch {
-    win.webContents.send("settings:loaded", { windowPeeking: false });
-  }
+  await sendOrDefault(
+    win,
+    "settings:loaded",
+    () =>
+      Effect.runPromise(
+        Effect.tryPromise({
+          catch: () => new Error("read failed"),
+          try: () =>
+            import("node:fs/promises").then((fs) =>
+              fs.readFile(
+                path.join(app.getPath("userData"), "settings.json"),
+                "utf-8"
+              )
+            ),
+        }).pipe(Effect.provide(MainLayer))
+      ).then((content) => JSON.parse(content)),
+    { windowPeeking: false }
+  );
 };

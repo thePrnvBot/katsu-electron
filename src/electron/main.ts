@@ -28,6 +28,18 @@ app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 
 setupWebContentsListeners();
 
+const WINDOW_ACTIONS: Record<string, (win: BrowserWindow) => void> = {
+  close: (win) => win.close(),
+  maximize: (win) => {
+    if (win.isMaximized()) {
+      win.unmaximize();
+    } else {
+      win.maximize();
+    }
+  },
+  minimize: (win) => win.minimize(),
+};
+
 app.on("ready", async () => {
   // Initialize ad blocker before creating window
   await Effect.runPromise(
@@ -50,17 +62,7 @@ app.on("ready", async () => {
           if (!win) {
             return;
           }
-          if (action === "close") {
-            win.close();
-          } else if (action === "minimize") {
-            win.minimize();
-          } else if (action === "maximize") {
-            if (win.isMaximized()) {
-              win.unmaximize();
-            } else {
-              win.maximize();
-            }
-          }
+          WINDOW_ACTIONS[action]?.(win);
         })
       );
     }).pipe(Effect.provide(MainLayer))

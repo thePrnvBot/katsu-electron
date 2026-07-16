@@ -1,15 +1,13 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { app } from "electron";
 
 import { PersistenceError } from "../shared/errors/persistence-error.js";
 import type { WindowMetadata } from "../shared/types.js";
-import { getUserData } from "../util.js";
+import { getUserData, writeFileAtomic } from "../util.js";
 
 const BoundsSchema = Schema.Struct({
   height: Schema.Number,
@@ -64,19 +62,8 @@ export const PersistenceLive = Layer.succeed(Persistence, {
   }),
 
   saveState: (windows: readonly WindowMetadata[]) =>
-    Effect.gen(function* saveState() {
-      const filePath = StateFilePath;
-      const tmpPath = `${filePath}.tmp`;
-      const content = JSON.stringify(windows, null, 2);
-
-      yield* Effect.tryPromise({
-        catch: (err) => new PersistenceError("WriteFailed", err),
-        try: () => fs.writeFile(tmpPath, content, "utf-8"),
-      });
-
-      yield* Effect.tryPromise({
-        catch: (err) => new PersistenceError("AtomicRenameFailed", err),
-        try: () => fs.rename(tmpPath, filePath),
-      });
+    writeFileAtomic(StateFilePath, JSON.stringify(windows, null, 2), {
+      rename: (err) => new PersistenceError("AtomicRenameFailed", err),
+      write: (err) => new PersistenceError("WriteFailed", err),
     }),
 });

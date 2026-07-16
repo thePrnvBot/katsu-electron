@@ -1,16 +1,12 @@
-import * as fs from "node:fs/promises";
-import path from "node:path";
-
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { app } from "electron";
 
 import { IPCCommand } from "../schemas/ipc-schemas.js";
 import type { WindowMetadata } from "../shared/types.js";
 import { IPCError } from "../shared/types.js";
-import { getUserData } from "../util.js";
+import { getUserData, writeFileAtomic } from "../util.js";
 
 type CommandHandler = (payload: unknown) => Effect.Effect<unknown, IPCError>;
 
@@ -55,33 +51,28 @@ export const IPCRouterLive = Layer.succeed(IPCRouter, {
     }),
 });
 
+const registerCommand = (type: string, handler: CommandHandler): void => {
+  Effect.runSync(
+    Effect.gen(function* registerCommandGen() {
+      const router = yield* IPCRouter;
+      return yield* router.registerHandler(type, handler);
+    }).pipe(Effect.provide(IPCRouterLive))
+  );
+};
+
 const stateSaveHandler: CommandHandler = (payload) =>
   Effect.gen(function* stateSaveHandlerGen() {
     const { windows } = payload as { windows: WindowMetadata[] };
 
-    const filePath = StateFilePath;
-    const tmpPath = `${filePath}.tmp`;
-    const content = JSON.stringify(windows, null, 2);
-
-    yield* Effect.tryPromise({
-      catch: (err) => new IPCError("CommandFailed", "state:save", err),
-      try: () => fs.writeFile(tmpPath, content, "utf-8"),
-    });
-
-    yield* Effect.tryPromise({
-      catch: (err) => new IPCError("CommandFailed", "state:save", err),
-      try: () => fs.rename(tmpPath, filePath),
+    yield* writeFileAtomic(StateFilePath, JSON.stringify(windows, null, 2), {
+      rename: (err) => new IPCError("CommandFailed", "state:save", err),
+      write: (err) => new IPCError("CommandFailed", "state:save", err),
     });
 
     return { saved: windows.length };
   });
 
-Effect.runSync(
-  Effect.gen(function* registerStateSave() {
-    const router = yield* IPCRouter;
-    return yield* router.registerHandler("state:save", stateSaveHandler);
-  }).pipe(Effect.provide(IPCRouterLive))
-);
+registerCommand("state:save", stateSaveHandler);
 
 const settingsSaveHandler: CommandHandler = (payload) =>
   Effect.gen(function* settingsSaveHandlerGen() {
@@ -89,26 +80,16 @@ const settingsSaveHandler: CommandHandler = (payload) =>
       settings: { windowPeeking: boolean };
     };
 
-    const filePath = SettingsFilePath;
-    const tmpPath = `${filePath}.tmp`;
-    const content = JSON.stringify(settings, null, 2);
-
-    yield* Effect.tryPromise({
-      catch: (err) => new IPCError("CommandFailed", "settings:save", err),
-      try: () => fs.writeFile(tmpPath, content, "utf-8"),
-    });
-
-    yield* Effect.tryPromise({
-      catch: (err) => new IPCError("CommandFailed", "settings:save", err),
-      try: () => fs.rename(tmpPath, filePath),
-    });
+    yield* writeFileAtomic(
+      SettingsFilePath,
+      JSON.stringify(settings, null, 2),
+      {
+        rename: (err) => new IPCError("CommandFailed", "settings:save", err),
+        write: (err) => new IPCError("CommandFailed", "settings:save", err),
+      }
+    );
 
     return { saved: true };
   });
 
-Effect.runSync(
-  Effect.gen(function* registerSettingsSave() {
-    const router = yield* IPCRouter;
-    return yield* router.registerHandler("settings:save", settingsSaveHandler);
-  }).pipe(Effect.provide(IPCRouterLive))
-);
+registerCommand("settings:save", settingsSaveHandler);
