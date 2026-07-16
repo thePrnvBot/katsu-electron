@@ -6,21 +6,37 @@ interface TextPreviewProps {
 }
 
 export const TextPreview = ({ fileName, url }: TextPreviewProps) => {
-  const [content, setContent] = useState<string>("");
+  const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadText = async () => {
+      setError(false);
+      setContent(null);
+
       try {
         const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
         const text = await response.text();
-        setContent(text);
+        if (!cancelled) {
+          setContent(text);
+        }
       } catch {
-        setError(true);
+        if (!cancelled) {
+          setError(true);
+        }
       }
     };
 
     loadText();
+
+    return () => {
+      cancelled = true;
+    };
   }, [url]);
 
   const ext = fileName.split(".").pop() ?? "text";
@@ -42,6 +58,27 @@ export const TextPreview = ({ fileName, url }: TextPreviewProps) => {
         <div style={{ fontSize: 32, opacity: 0.4 }}>&#9888;</div>
         <div style={{ color: "#ddd", fontSize: 14 }}>{fileName}</div>
         <div style={{ fontSize: 12 }}>Failed to load file content</div>
+      </div>
+    );
+  }
+
+  if (content === null) {
+    return (
+      <div
+        style={{
+          alignItems: "center",
+          background: "#0f0f0f",
+          color: "#999",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          height: "100%",
+          justifyContent: "center",
+        }}
+      >
+        <div style={{ fontSize: 32, opacity: 0.4 }}>&#128204;</div>
+        <div style={{ color: "#ddd", fontSize: 14 }}>{fileName}</div>
+        <div style={{ fontSize: 12 }}>Loading file content...</div>
       </div>
     );
   }
@@ -77,7 +114,7 @@ export const TextPreview = ({ fileName, url }: TextPreviewProps) => {
           wordWrap: "break-word",
         }}
       >
-        {content || "Loading..."}
+        {content}
       </pre>
     </div>
   );

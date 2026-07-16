@@ -8,6 +8,9 @@ interface ElectronAPI {
     canceled: boolean;
     filePaths: string[];
   }>;
+  readFile: (
+    filePath: string
+  ) => Promise<{ name: string; buffer: ArrayBuffer }>;
   setStateLoadedHandler: (handler: (windows: unknown[]) => void) => void;
   setSettingsLoadedHandler: (handler: (settings: unknown) => void) => void;
   setEventHandler: (handler: (event: unknown) => void) => void;

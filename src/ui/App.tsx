@@ -8,71 +8,11 @@ import { SearchBar } from "./components/search-bar";
 import { TitleBar } from "./components/title-bar";
 import { Window } from "./components/window";
 import { World } from "./components/world";
-import { IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "./lib/constants";
 import { useCameraStore } from "./store/camera-store";
 import { useSettingsStore } from "./store/settings-store";
 import { useWindowStore } from "./store/window-store";
-import { createFilePreview, getPreviewType } from "./utils/file-preview";
+import { createFilePreview, type PreviewType } from "./utils/file-preview";
 import { computeWindowSize } from "./utils/layout";
-
-const getMediaDimensions = (
-  url: string,
-  ext: string
-): Promise<{ w: number; h: number }> =>
-  new Promise((resolve) => {
-    let resolved = false;
-    const safeResolve = (value: { h: number; w: number }) => {
-      if (!resolved) {
-        resolved = true;
-        resolve(value);
-      }
-    };
-
-    const timeout = setTimeout(() => safeResolve({ h: 0, w: 0 }), 3000);
-
-    if (IMAGE_EXTENSIONS.has(ext)) {
-      const img = new Image();
-      img.addEventListener(
-        "load",
-        () => {
-          clearTimeout(timeout);
-          safeResolve({ h: img.naturalHeight, w: img.naturalWidth });
-        },
-        { once: true }
-      );
-      img.addEventListener(
-        "error",
-        () => {
-          clearTimeout(timeout);
-          safeResolve({ h: 0, w: 0 });
-        },
-        { once: true }
-      );
-      img.src = url;
-    } else if (VIDEO_EXTENSIONS.has(ext)) {
-      const video = document.createElement("video");
-      video.addEventListener(
-        "loadedmetadata",
-        () => {
-          clearTimeout(timeout);
-          safeResolve({ h: video.videoHeight, w: video.videoWidth });
-        },
-        { once: true }
-      );
-      video.addEventListener(
-        "error",
-        () => {
-          clearTimeout(timeout);
-          safeResolve({ h: 0, w: 0 });
-        },
-        { once: true }
-      );
-      video.src = url;
-    } else {
-      clearTimeout(timeout);
-      safeResolve({ h: 0, w: 0 });
-    }
-  });
 
 const normalizeUrl = (value: string): string | null => {
   if (!value) {
@@ -112,9 +52,7 @@ export default function App() {
             fileName: win.title as string | undefined,
             h: bounds?.height ?? 400,
             id: win.id as string,
-            previewType: win.previewType as
-              | ReturnType<typeof getPreviewType>
-              | undefined,
+            previewType: win.previewType as PreviewType | undefined,
             url: win.url as string,
             w: bounds?.width ?? 600,
             x: bounds?.x ?? 100,
@@ -259,54 +197,13 @@ export default function App() {
   const handleOpenFileDialog = async () => {
     const result = await window.electronAPI.openFile();
     if (!result.canceled && result.filePaths.length > 0) {
-      const fileData = await Promise.all(
+      const files = await Promise.all(
         result.filePaths.map(async (filePath) => {
-          const fileName = filePath.split(/[/\\]/u).pop() ?? filePath;
-          const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-          const previewType = getPreviewType("", fileName);
-          const rawUrl = `katsu://preview/${encodeURIComponent(filePath)}?raw`;
-
-          let nativeW: number | undefined;
-          let nativeH: number | undefined;
-
-          if (previewType === "image" || previewType === "video") {
-            const dims = await getMediaDimensions(rawUrl, ext);
-            nativeW = dims.w || undefined;
-            nativeH = dims.h || undefined;
-          }
-
-          return { fileName, nativeH, nativeW, previewType, rawUrl };
+          const { name, buffer } = await window.electronAPI.readFile(filePath);
+          return new File([buffer], name);
         })
       );
-
-      for (const {
-        fileName,
-        nativeH,
-        nativeW,
-        previewType,
-        rawUrl,
-      } of fileData) {
-        const { w, h } = computeWindowSize(
-          nativeW,
-          nativeH,
-          grid.cellWidth,
-          grid.cellHeight
-        );
-
-        const newWindowId = crypto.randomUUID();
-        addWindow({
-          fileName,
-          h,
-          id: newWindowId,
-          previewType,
-          url: rawUrl,
-          w,
-          x: currentCell.x * grid.cellWidth + (grid.cellWidth - w) / 2,
-          y: currentCell.y * grid.cellHeight + (grid.cellHeight - h) / 2,
-        });
-        setActiveWindow(newWindowId);
-        bringToFront(newWindowId);
-      }
+      await handleFileOpen(files);
     }
   };
 

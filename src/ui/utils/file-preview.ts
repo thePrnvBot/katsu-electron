@@ -2,51 +2,8 @@ import {
   AUDIO_EXTENSIONS,
   IMAGE_EXTENSIONS,
   VIDEO_EXTENSIONS,
+  TEXT_EXTENSIONS,
 } from "../lib/constants";
-
-const TEXT_EXTENSIONS = new Set([
-  "ts",
-  "tsx",
-  "js",
-  "jsx",
-  "json",
-  "md",
-  "css",
-  "html",
-  "htm",
-  "xml",
-  "svg",
-  "yaml",
-  "yml",
-  "toml",
-  "ini",
-  "cfg",
-  "conf",
-  "env",
-  "py",
-  "rb",
-  "go",
-  "rs",
-  "java",
-  "c",
-  "cpp",
-  "h",
-  "hpp",
-  "sh",
-  "bash",
-  "zsh",
-  "fish",
-  "ps1",
-  "bat",
-  "cmd",
-  "sql",
-  "graphql",
-  "gql",
-  "txt",
-  "log",
-  "csv",
-  "tsv",
-]);
 
 const TEXT_MIME_PREFIXES = [
   "text/",
@@ -171,6 +128,18 @@ export const createFilePreview = async (
       nativeWidth: w || undefined,
       previewType,
       url: rawUrl,
+    };
+  }
+
+  if (previewType === "text") {
+    const text = await file.text();
+    const blob = new Blob([text], { type: file.type || "text/plain" });
+    const url = URL.createObjectURL(blob);
+
+    return {
+      fileName,
+      previewType,
+      url,
     };
   }
 

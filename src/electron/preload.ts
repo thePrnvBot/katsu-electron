@@ -72,6 +72,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   platform: process.platform,
 
+  readFile: (filePath: string) => ipcRenderer.invoke("fs:readFile", filePath),
+
   respondToPermission: (permissionId: string, granted: boolean) =>
     ipcRenderer.invoke(`permission:response:${permissionId}`, granted),
 

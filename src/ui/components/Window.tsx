@@ -208,18 +208,6 @@ export const Window = ({ windowId }: { windowId: string }) => {
     return unsub;
   }, [showAdPill, win?.url, windowId]);
 
-  useEffect(
-    () => () => {
-      const w = useWindowStore
-        .getState()
-        .windows.find((x) => x.id === windowId);
-      if (w && w.url.startsWith("blob:")) {
-        URL.revokeObjectURL(w.url);
-      }
-    },
-    [windowId]
-  );
-
   if (!win) {
     return null;
   }

@@ -45,6 +45,13 @@ export const registerIpcHandlers = (): void => {
     return { canceled: result.canceled, filePaths: result.filePaths };
   });
 
+  // FS: read file
+  ipcMain.handle("fs:readFile", async (_event, filePath: string) => {
+    const name = path.basename(filePath);
+    const buffer = await fs.readFile(filePath);
+    return { buffer, name };
+  });
+
   // Dialog: save temp file
   ipcMain.handle(
     "dialog:saveTempFile",
