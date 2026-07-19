@@ -3,9 +3,8 @@
   "entry": [
     "src/electron/main.ts",
     "src/electron/preload.ts",
-    "src/electron/webview-preload.ts"
+    "src/ui/types/electron.d.ts"
   ],
   "project": ["src/**/*.{ts,tsx}", "*.ts"],
-  "ignore": ["src/ui/lib/utils.ts"],
   "ignoreDependencies": ["clsx", "geist", "tailwind-merge", "tailwindcss"]
 }

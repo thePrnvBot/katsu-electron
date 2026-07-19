@@ -7,7 +7,7 @@ export default defineConfig({
   ignorePatterns: core.ignorePatterns,
   overrides: [
     {
-      files: ["src/electron/main.ts"],
+      files: ["src/electron/main.ts", "src/electron/session/setup.ts"],
       rules: {
         "promise/no-callback-in-promise": "off",
         "promise/prefer-await-to-callbacks": "off",

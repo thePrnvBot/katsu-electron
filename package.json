@@ -4,7 +4,7 @@
   "private": true,
   "author": "thePrnvBot",
   "type": "module",
-  "main": "dist-electron/main.js",
+  "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev": "run-p dev:react dev:electron",
     "dev:react": "vite",
@@ -18,8 +18,7 @@
     "dist:linux": "pnpm transpile:electron && pnpm build && electron-builder --linux --x64",
     "check": "ultracite check",
     "fix": "ultracite fix",
-    "knip": "knip",
-    "prepare": "husky"
+    "knip": "knip"
   },
   "dependencies": {
     "@gorhill/ubo-core": "^0.1.30",
