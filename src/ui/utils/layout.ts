@@ -5,6 +5,17 @@ export interface Size {
   readonly w: number;
 }
 
+/** Top-left position that centers a w×h window inside the given cell. */
+export const centerBoundsInCell = (
+  w: number,
+  h: number,
+  grid: { cellWidth: number; cellHeight: number },
+  cell: { x: number; y: number }
+): { x: number; y: number } => ({
+  x: cell.x * grid.cellWidth + (grid.cellWidth - w) / 2,
+  y: cell.y * grid.cellHeight + (grid.cellHeight - h) / 2,
+});
+
 /**
  * Compute the displayed window size for a media element,
  * scaling down to fit within the cell while preserving aspect ratio.

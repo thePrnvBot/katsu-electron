@@ -2,6 +2,8 @@ import { ArrowRight, FileUp } from "lucide-react";
 import { useState } from "react";
 
 import { useAutoHide } from "../hooks/use-auto-hide";
+import { Z_SEARCH_BAR } from "../lib/constants";
+import { AutoHidePill } from "./auto-hide-pill";
 
 interface SearchBarProps {
   url: string;
@@ -22,7 +24,10 @@ export const SearchBar = ({
   const visible = !(hidden && !focused);
 
   return (
-    <div className="fixed left-1/2 top-8 z-40 -translate-x-1/2">
+    <div
+      className="fixed left-1/2 top-8 -translate-x-1/2"
+      style={{ zIndex: Z_SEARCH_BAR }}
+    >
       <div
         onMouseMove={show}
         onMouseEnter={show}
@@ -33,6 +38,7 @@ export const SearchBar = ({
         <span className="px-4 pr-2 text-sm text-white/70">Katsu</span>
 
         <input
+          aria-label="Site URL"
           placeholder="Enter a URL..."
           value={url}
           onChange={(e) => {
@@ -58,6 +64,7 @@ export const SearchBar = ({
 
         <button
           type="button"
+          aria-label="Open local file"
           onClick={() => {
             onOpenFileDialog();
             show();
@@ -70,6 +77,7 @@ export const SearchBar = ({
 
         <button
           type="button"
+          aria-label="Open site"
           onClick={() => {
             openSite();
             show();
@@ -80,12 +88,7 @@ export const SearchBar = ({
         </button>
       </div>
 
-      <div
-        onMouseEnter={show}
-        className={`absolute left-1/2 top-0 h-3 w-16 -translate-x-1/2 rounded-b-full border border-white/10 border-t-0 bg-[#222] shadow-md shadow-black/30 transition-opacity ${
-          hidden && !focused ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-      />
+      <AutoHidePill hidden={hidden && !focused} onShow={show} position="top" />
     </div>
   );
 };
