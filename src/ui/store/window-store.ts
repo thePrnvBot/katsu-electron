@@ -1,7 +1,13 @@
 import { create } from "zustand";
 
-import type { PreviewType } from "../utils/file-preview";
-import { revokeBlobUrl } from "../utils/file-preview";
+import type { PreviewType } from "../../shared/contract";
+import {
+  DEFAULT_WINDOW_HEIGHT,
+  DEFAULT_WINDOW_WIDTH,
+  DEFAULT_WINDOW_X,
+  DEFAULT_WINDOW_Y,
+} from "../lib/constants";
+import { revokePreviewUrl } from "../utils/file-preview";
 import type { WindowLayout } from "../utils/window-layouts";
 import { resolveLayout } from "../utils/window-layouts";
 import { useCameraStore } from "./camera-store";
@@ -63,7 +69,12 @@ export const useWindowStore = create<WindowState>((set) => ({
       }
 
       if (w.maximized) {
-        const pb = w.prevBounds ?? { h: 400, w: 600, x: 100, y: 100 };
+        const pb = w.prevBounds ?? {
+          h: DEFAULT_WINDOW_HEIGHT,
+          w: DEFAULT_WINDOW_WIDTH,
+          x: DEFAULT_WINDOW_X,
+          y: DEFAULT_WINDOW_Y,
+        };
         return {
           windows: s.windows.map((x) =>
             x.id === id
@@ -104,7 +115,7 @@ export const useWindowStore = create<WindowState>((set) => ({
     set((s) => {
       const win = s.windows.find((w) => w.id === id);
       if (win) {
-        revokeBlobUrl(win.url);
+        revokePreviewUrl(win.url);
       }
       return {
         activeWindowId: s.activeWindowId === id ? null : s.activeWindowId,

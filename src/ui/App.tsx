@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 
+import type { PreviewType } from "../shared/contract";
+import { parseSettings, parseWindowMetadataArray } from "../shared/contract";
 import { CameraAnimator } from "./components/camera-animator";
 import { CommandMenu } from "./components/command-menu";
 import { Minimap } from "./components/minimap";
@@ -8,12 +11,16 @@ import { SearchBar } from "./components/search-bar";
 import { TitleBar } from "./components/title-bar";
 import { Window } from "./components/window";
 import { World } from "./components/world";
+import { ARROW_DELTAS, WHEEL_CELL_THRESHOLD } from "./lib/constants";
 import { useCameraStore } from "./store/camera-store";
+import { usePermissionStore } from "./store/permission-store";
 import { useSettingsStore } from "./store/settings-store";
 import { useWindowStore } from "./store/window-store";
-import { createFilePreview } from "./utils/file-preview";
-import type { PreviewType } from "./utils/file-preview";
-import { computeWindowSize } from "./utils/layout";
+import {
+  createFilePreview,
+  createFilePreviewFromPath,
+} from "./utils/file-preview";
+import { centerBoundsInCell, computeWindowSize } from "./utils/layout";
 
 const KNOWN_SCHEMES = ["file://", "katsu://", "http://", "https://"] as const;
 
@@ -27,18 +34,14 @@ const normalizeUrl = (value: string): string | null => {
   return `https://${value}`;
 };
 
-const ARROW_DELTAS: Record<string, [number, number]> = {
-  ArrowDown: [0, 1],
-  ArrowLeft: [-1, 0],
-  ArrowRight: [1, 0],
-  ArrowUp: [0, -1],
-};
-
-export default function App() {
+export const App = () => {
   const moveCell = useCameraStore((s) => s.moveCell);
   const currentCell = useCameraStore((s) => s.currentCell);
   const grid = useCameraStore((s) => s.grid);
-  const windows = useWindowStore((s) => s.windows);
+  // Selector returns a new array only when the set of ids changes.
+  const windowIds = useWindowStore(
+    useShallow((s) => s.windows.map((w) => w.id))
+  );
   const addWindow = useWindowStore((s) => s.addWindow);
   const bringToFront = useWindowStore((s) => s.bringToFront);
   const setActiveWindow = useWindowStore((s) => s.setActiveWindow);
@@ -46,43 +49,40 @@ export default function App() {
   const [urlField, setUrlField] = useState("");
   const wheelAccum = useRef({ x: 0, y: 0 });
 
-  // Load persisted state on mount
+  // Load persisted state on mount — parsed at the boundary, no casts.
   useEffect(() => {
-    window.electronAPI.setStateLoadedHandler((savedWindows: unknown[]) => {
-      if (Array.isArray(savedWindows)) {
-        for (const w of savedWindows) {
-          const win = w as Record<string, unknown>;
-          const bounds = win.bounds as Record<string, number> | undefined;
-          addWindow({
-            fileName: win.title as string | undefined,
-            h: bounds?.height ?? 400,
-            id: win.id as string,
-            previewType: win.previewType as PreviewType | undefined,
-            url: win.url as string,
-            w: bounds?.width ?? 600,
-            x: bounds?.x ?? 100,
-            y: bounds?.y ?? 100,
-            z: win.zIndex as number | undefined,
-          });
-        }
-      }
-    });
-
-    window.electronAPI.setSettingsLoadedHandler((savedSettings: unknown) => {
-      if (
-        savedSettings &&
-        typeof savedSettings === "object" &&
-        "windowPeeking" in savedSettings
-      ) {
-        loadSettings({
-          windowPeeking: (savedSettings as { windowPeeking: boolean })
-            .windowPeeking,
+    window.electronAPI.setStateLoadedHandler((savedWindows) => {
+      for (const meta of parseWindowMetadataArray(savedWindows)) {
+        addWindow({
+          fileName: meta.title,
+          h: meta.bounds.height,
+          id: meta.id,
+          previewType: meta.previewType,
+          url: meta.url,
+          w: meta.bounds.width,
+          x: meta.bounds.x,
+          y: meta.bounds.y,
+          z: meta.zIndex,
         });
       }
     });
+
+    window.electronAPI.setSettingsLoadedHandler((savedSettings) => {
+      loadSettings(parseSettings(savedSettings));
+    });
   }, [addWindow, loadSettings]);
 
-  // Save state when main process requests it (before quit)
+  // Persist settings whenever they change (e.g. windowPeeking toggle).
+  useEffect(() => {
+    const unsub = useSettingsStore.subscribe((state, prev) => {
+      if (state.settings !== prev.settings) {
+        void window.electronAPI.saveSettings(state.settings);
+      }
+    });
+    return unsub;
+  }, []);
+
+  // Save state when main process requests it (before quit).
   useEffect(() => {
     window.electronAPI.setRequestSaveHandler(() => {
       const currentWindows = useWindowStore.getState().windows;
@@ -94,26 +94,27 @@ export default function App() {
         url: w.url,
         zIndex: w.z ?? 1,
       }));
-      window.electronAPI.saveStateResponse(metadata);
+      void window.electronAPI.saveStateResponse(metadata);
     });
   }, []);
 
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
-      const target = e.target as HTMLElement;
-      if (target?.tagName === "IFRAME" || target?.tagName === "WEBVIEW") {
+      if (!(e.target instanceof HTMLElement)) {
+        return;
+      }
+      if (e.target.tagName === "IFRAME" || e.target.tagName === "WEBVIEW") {
         return;
       }
 
-      const threshold = 80;
       wheelAccum.current.x += e.deltaX;
       wheelAccum.current.y += e.deltaY;
 
-      if (Math.abs(wheelAccum.current.x) > threshold) {
+      if (Math.abs(wheelAccum.current.x) > WHEEL_CELL_THRESHOLD) {
         moveCell(wheelAccum.current.x > 0 ? 1 : -1, 0);
         wheelAccum.current.x = 0;
       }
-      if (Math.abs(wheelAccum.current.y) > threshold) {
+      if (Math.abs(wheelAccum.current.y) > WHEEL_CELL_THRESHOLD) {
         moveCell(0, wheelAccum.current.y > 0 ? 1 : -1);
         wheelAccum.current.y = 0;
       }
@@ -128,7 +129,11 @@ export default function App() {
       if (e.target instanceof HTMLInputElement) {
         return;
       }
-      if ((e.target as HTMLElement).closest("[cmdk-root]")) {
+      if (e.target instanceof HTMLElement && e.target.closest("[cmdk-root]")) {
+        return;
+      }
+      // Permission dialog is modal — arrow keys must not pan the camera behind it.
+      if (usePermissionStore.getState().request) {
         return;
       }
       const delta = ARROW_DELTAS[e.key];
@@ -167,43 +172,49 @@ export default function App() {
     setUrlField("");
   };
 
+  const addPreview = (preview: {
+    fileName: string;
+    previewType: PreviewType;
+    url: string;
+  }) => {
+    const newWindowId = crypto.randomUUID();
+    const { w, h } = computeWindowSize(
+      undefined,
+      undefined,
+      grid.cellWidth,
+      grid.cellHeight
+    );
+    const { x, y } = centerBoundsInCell(w, h, grid, currentCell);
+    addWindow({
+      fileName: preview.fileName,
+      h,
+      id: newWindowId,
+      previewType: preview.previewType,
+      url: preview.url,
+      w,
+      x,
+      y,
+    });
+    activateWindow(newWindowId);
+  };
+
   const handleFileOpen = async (files: File[]) => {
     const previews = await Promise.all(files.map(createFilePreview));
-
     for (const preview of previews) {
-      const { url, fileName, nativeWidth, nativeHeight, previewType } = preview;
-      const newWindowId = crypto.randomUUID();
-      const { w, h } = computeWindowSize(
-        nativeWidth,
-        nativeHeight,
-        grid.cellWidth,
-        grid.cellHeight
-      );
-
-      addWindow({
-        fileName,
-        h,
-        id: newWindowId,
-        previewType,
-        url,
-        w,
-        x: currentCell.x * grid.cellWidth + (grid.cellWidth - w) / 2,
-        y: currentCell.y * grid.cellHeight + (grid.cellHeight - h) / 2,
-      });
-      activateWindow(newWindowId);
+      addPreview(preview);
     }
   };
 
   const handleOpenFileDialog = async () => {
     const result = await window.electronAPI.openFile();
-    if (!result.canceled && result.filePaths.length > 0) {
-      const files = await Promise.all(
-        result.filePaths.map(async (filePath) => {
-          const { name, buffer } = await window.electronAPI.readFile(filePath);
-          return new File([buffer], name);
-        })
-      );
-      await handleFileOpen(files);
+    if (result.canceled || result.filePaths.length === 0) {
+      return;
+    }
+    const staged = await Promise.all(
+      result.filePaths.map((p) => window.electronAPI.stageFile(p))
+    );
+    for (const { name, path: stagedPath } of staged) {
+      addPreview(createFilePreviewFromPath(name, stagedPath));
     }
   };
 
@@ -219,12 +230,12 @@ export default function App() {
         onOpenFileDialog={handleOpenFileDialog}
       />
       <World onFileDrop={handleFileOpen}>
-        {windows.map((w) => (
-          <Window key={w.id} windowId={w.id} />
+        {windowIds.map((id) => (
+          <Window key={id} windowId={id} />
         ))}
       </World>
       <Minimap />
       <PermissionDialog />
     </div>
   );
-}
+};

@@ -1,46 +1,44 @@
-interface ElectronAPI {
-  sendCommand: (command: unknown) => Promise<{
-    success: boolean;
-    data?: unknown;
-    error?: string;
-  }>;
+import type {
+  BlockedCountPayload,
+  IPCCommand,
+  IPCResult,
+  PermissionRequestPayload,
+  Settings,
+  WindowMetadata,
+} from "../../shared/contract";
+
+export interface ElectronAPI {
+  /** Delete a temp preview file inside the drops dir. */
+  deleteTempFile: (filePath: string) => Promise<void>;
+  /** Native open dialog; grants stage capability for the picked paths. */
   openFile: () => Promise<{
     canceled: boolean;
     filePaths: string[];
   }>;
-  readFile: (
-    filePath: string
-  ) => Promise<{ name: string; buffer: ArrayBuffer }>;
-  setStateLoadedHandler: (handler: (windows: unknown[]) => void) => void;
-  setSettingsLoadedHandler: (handler: (settings: unknown) => void) => void;
-  setEventHandler: (handler: (event: unknown) => void) => void;
-  platform: string;
-  getWebviewPreloadPath: () => string;
-  getUserAgent: () => string;
+  respondToPermission: (
+    requestId: string,
+    granted: boolean
+  ) => Promise<IPCResult>;
+  saveSettings: (settings: Settings) => Promise<IPCResult>;
+  saveStateResponse: (windows: WindowMetadata[]) => Promise<void>;
+  saveTempFile: (name: string, buffer: ArrayBuffer) => Promise<string>;
+  sendCommand: (command: IPCCommand) => Promise<IPCResult>;
   setBlockedCountHandler: (
     subscriberId: string,
-    handler: (data: { count: number; origin: string }) => void
+    handler: (data: BlockedCountPayload) => void
   ) => () => void;
   setPermissionRequestHandler: (
-    handler: (request: {
-      id: string;
-      permission: string;
-      origin: string;
-      message: string;
-    }) => void
+    handler: (request: PermissionRequestPayload) => void
   ) => void;
-  respondToPermission: (
-    permissionId: string,
-    granted: boolean
-  ) => Promise<unknown>;
-  saveState: (windows: unknown[]) => Promise<unknown>;
-  saveSettings: (settings: unknown) => Promise<unknown>;
-  loadSettings: () => Promise<unknown>;
   setRequestSaveHandler: (handler: () => void) => void;
-  saveStateResponse: (windows: unknown[]) => Promise<unknown>;
-  saveTempFile: (name: string, buffer: ArrayBuffer) => Promise<string>;
+  setSettingsLoadedHandler: (handler: (settings: Settings) => void) => void;
+  setStateLoadedHandler: (handler: (windows: WindowMetadata[]) => void) => void;
+  /** Copy a dialog-granted file into the drops dir (no buffer round-trip). */
+  stageFile: (filePath: string) => Promise<{ name: string; path: string }>;
 }
 
-interface Window {
-  electronAPI: ElectronAPI;
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
 }
