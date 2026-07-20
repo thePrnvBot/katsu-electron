@@ -3,93 +3,119 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-import { IPCCommand } from "../schemas/ipc-schemas.js";
-import type { WindowMetadata } from "../shared/types.js";
-import { IPCError } from "../shared/types.js";
-import { getUserData, writeFileAtomic } from "../util.js";
+import type { IPCCommand } from "../../shared/contract.js";
+import { IPCCommandSchema, SettingsSchema } from "../schemas/ipc-schemas.js";
 
-type CommandHandler = (payload: unknown) => Effect.Effect<unknown, IPCError>;
+import { Permissions } from "./permissions.js";
+import { Persistence } from "./persistence.js";
+import { IPCError } from "../shared/errors/ipc-error.js";
+
+type CommandServices = Permissions | Persistence;
+
+export type CommandHandler = (
+  payload: unknown
+) => Effect.Effect<unknown, IPCError, CommandServices>;
 
 export interface IPCRouter {
   readonly handleCommand: (
     command: unknown
-  ) => Effect.Effect<unknown, IPCError>;
-  readonly registerHandler: (
-    type: string,
-    handler: CommandHandler
-  ) => Effect.Effect<void>;
+  ) => Effect.Effect<unknown, IPCError, CommandServices>;
 }
 
 export const IPCRouter = Context.GenericTag<IPCRouter>("IPCRouter");
 
 const handlers = new Map<string, CommandHandler>();
 
-const StateFilePath: string = getUserData("windows.json");
+/**
+ * Synchronous registration — the handler map is a module singleton, so
+ * there is no reason to route registration through the Effect runtime.
+ */
+export const registerCommandHandler = (
+  type: IPCCommand["type"],
+  handler: CommandHandler
+): void => {
+  handlers.set(type, handler);
+};
 
-const SettingsFilePath: string = getUserData("settings.json");
+/** Parse a payload at the handler boundary — no casts. */
+export const decodeCommandPayload = <A, I>(
+  schema: Schema.Schema<A, I>,
+  value: unknown,
+  command: string
+): Effect.Effect<A, IPCError> =>
+  Effect.try({
+    catch: (cause) =>
+      new IPCError({ cause, command, reason: "SchemaValidationFailed" }),
+    try: () => Schema.decodeUnknownSync(schema)(value),
+  });
 
 export const IPCRouterLive = Layer.succeed(IPCRouter, {
   handleCommand: (command: unknown) =>
     Effect.gen(function* handleCommand() {
-      const decoded = yield* Effect.try({
-        catch: () =>
-          new IPCError("SchemaValidationFailed", JSON.stringify(command)),
-        try: () => Schema.decodeUnknownSync(IPCCommand)(command),
-      });
+      const decoded = yield* decodeCommandPayload(
+        IPCCommandSchema,
+        command,
+        "unknown"
+      );
 
       const handler = handlers.get(decoded.type);
-      if (handler) {
-        return yield* handler(decoded.payload);
+      if (!handler) {
+        return yield* new IPCError({
+          command: decoded.type,
+          reason: "InvalidCommand",
+        });
       }
 
-      return { type: decoded.type } as unknown;
-    }),
-
-  registerHandler: (type: string, handler: CommandHandler) =>
-    Effect.sync(() => {
-      handlers.set(type, handler);
+      return yield* handler(decoded.payload);
     }),
 });
 
-const registerCommand = (type: string, handler: CommandHandler): void => {
-  Effect.runSync(
-    Effect.gen(function* registerCommandGen() {
-      const router = yield* IPCRouter;
-      return yield* router.registerHandler(type, handler);
-    }).pipe(Effect.provide(IPCRouterLive))
-  );
-};
+// --- Built-in command handlers ---
 
-const stateSaveHandler: CommandHandler = (payload) =>
-  Effect.gen(function* stateSaveHandlerGen() {
-    const { windows } = payload as { windows: WindowMetadata[] };
-
-    yield* writeFileAtomic(StateFilePath, JSON.stringify(windows, null, 2), {
-      rename: (err) => new IPCError("CommandFailed", "state:save", err),
-      write: (err) => new IPCError("CommandFailed", "state:save", err),
-    });
-
-    return { saved: windows.length };
-  });
-
-registerCommand("state:save", stateSaveHandler);
+const SettingsSavePayloadSchema = Schema.Struct({
+  settings: SettingsSchema,
+});
 
 const settingsSaveHandler: CommandHandler = (payload) =>
-  Effect.gen(function* settingsSaveHandlerGen() {
-    const { settings } = payload as {
-      settings: { windowPeeking: boolean };
-    };
-
-    yield* writeFileAtomic(
-      SettingsFilePath,
-      JSON.stringify(settings, null, 2),
-      {
-        rename: (err) => new IPCError("CommandFailed", "settings:save", err),
-        write: (err) => new IPCError("CommandFailed", "settings:save", err),
-      }
+  Effect.gen(function* settingsSave() {
+    const { settings } = yield* decodeCommandPayload(
+      SettingsSavePayloadSchema,
+      payload,
+      "settings:save"
     );
-
+    const persistence = yield* Persistence;
+    yield* persistence.saveSettings(settings).pipe(
+      Effect.mapError(
+        (cause) =>
+          new IPCError({
+            cause,
+            command: "settings:save",
+            reason: "CommandFailed",
+          })
+      )
+    );
     return { saved: true };
   });
 
-registerCommand("settings:save", settingsSaveHandler);
+const PermissionRespondPayloadSchema = Schema.Struct({
+  granted: Schema.Boolean,
+  requestId: Schema.String,
+});
+
+const permissionRespondHandler: CommandHandler = (payload) =>
+  Effect.gen(function* permissionRespond() {
+    const { requestId, granted } = yield* decodeCommandPayload(
+      PermissionRespondPayloadSchema,
+      payload,
+      "permission:respond"
+    );
+    const permissions = yield* Permissions;
+    yield* permissions.respondToRequest(requestId, granted);
+    return { responded: true };
+  });
+
+/** Called once from `registerIpcHandlers` — never at module import time. */
+export const registerBuiltinCommandHandlers = (): void => {
+  registerCommandHandler("settings:save", settingsSaveHandler);
+  registerCommandHandler("permission:respond", permissionRespondHandler);
+};

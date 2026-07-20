@@ -1,145 +1,118 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-let webviewPreloadPath = "";
-let userAgent = "";
+import type {
+  IPCCommand,
+  PermissionRequestPayload,
+  Settings,
+  WindowMetadata,
+} from "../shared/contract.js";
+import { IpcChannel } from "../shared/ipc-channels.js";
 
-ipcRenderer.once(
-  "config",
-  (_event, config: { userAgent: string; webviewPreloadPath: string }) => {
-    ({ webviewPreloadPath, userAgent } = config);
-  }
-);
-
-const _blockedCountSubscribers = new Map<
+const blockedCountSubscribers = new Map<
   string,
   (data: { count: number; origin: string }) => void
 >();
-ipcRenderer.on("adblock:count", (_event, data) => {
-  for (const handler of _blockedCountSubscribers.values()) {
+ipcRenderer.on(IpcChannel.adblockCount, (_event, data) => {
+  for (const handler of blockedCountSubscribers.values()) {
     handler(data);
   }
 });
 
-let _eventHandler: ((event: unknown) => void) | null = null;
-ipcRenderer.on("katsu:event", (_event, data) => {
-  _eventHandler?.(data);
-});
-
-let _permissionRequestHandler:
-  | ((request: {
-      id: string;
-      permission: string;
-      origin: string;
-      message: string;
-    }) => void)
+let permissionRequestHandler:
+  | ((request: PermissionRequestPayload) => void)
   | null = null;
-ipcRenderer.on("permission:request", (_event, request) => {
-  _permissionRequestHandler?.(request);
+ipcRenderer.on(IpcChannel.permissionRequest, (_event, request) => {
+  permissionRequestHandler?.(request);
 });
 
-let _requestSaveHandler: (() => void) | null = null;
-ipcRenderer.on("state:requestSave", () => {
-  _requestSaveHandler?.();
+let requestSaveHandler: (() => void) | null = null;
+ipcRenderer.on(IpcChannel.stateRequestSave, () => {
+  requestSaveHandler?.();
 });
 
-let _stateLoadedData: unknown[] | null = null;
-let _stateLoadedHandler: ((windows: unknown[]) => void) | null = null;
-ipcRenderer.once("state:loaded", (_event, windows) => {
-  if (_stateLoadedHandler) {
-    _stateLoadedHandler(windows);
+let stateLoadedData: WindowMetadata[] | null = null;
+let stateLoadedHandler: ((windows: WindowMetadata[]) => void) | null = null;
+ipcRenderer.on(IpcChannel.stateLoaded, (_event, windows) => {
+  if (stateLoadedHandler) {
+    stateLoadedHandler(windows);
   } else {
-    _stateLoadedData = windows;
+    stateLoadedData = windows;
   }
 });
 
-let _settingsLoadedData: unknown | null = null;
-let _settingsLoadedHandler: ((settings: unknown) => void) | null = null;
-ipcRenderer.once("settings:loaded", (_event, settings) => {
-  if (_settingsLoadedHandler) {
-    _settingsLoadedHandler(settings);
+let settingsLoadedData: Settings | null = null;
+let settingsLoadedHandler: ((settings: Settings) => void) | null = null;
+ipcRenderer.on(IpcChannel.settingsLoaded, (_event, settings) => {
+  if (settingsLoadedHandler) {
+    settingsLoadedHandler(settings);
   } else {
-    _settingsLoadedData = settings;
+    settingsLoadedData = settings;
   }
 });
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  getUserAgent: () => userAgent,
-  getWebviewPreloadPath: () => webviewPreloadPath,
+  deleteTempFile: (filePath: string) =>
+    ipcRenderer.invoke(IpcChannel.fsDeleteTempFile, filePath),
 
-  loadSettings: () => ipcRenderer.invoke("settings:load"),
+  openFile: () => ipcRenderer.invoke(IpcChannel.dialogOpenFile),
 
-  openFile: () => ipcRenderer.invoke("dialog:openFile"),
+  respondToPermission: (requestId: string, granted: boolean) =>
+    ipcRenderer.invoke(IpcChannel.command, {
+      payload: { granted, requestId },
+      type: "permission:respond",
+    }),
 
-  platform: process.platform,
-
-  readFile: (filePath: string) => ipcRenderer.invoke("fs:readFile", filePath),
-
-  respondToPermission: (permissionId: string, granted: boolean) =>
-    ipcRenderer.invoke(`permission:response:${permissionId}`, granted),
-
-  saveSettings: (settings: unknown) =>
-    ipcRenderer.invoke("katsu:command", {
+  saveSettings: (settings: Settings) =>
+    ipcRenderer.invoke(IpcChannel.command, {
       payload: { settings },
       type: "settings:save",
     }),
 
-  saveState: (windows: unknown[]) =>
-    ipcRenderer.invoke("katsu:command", {
-      payload: { windows },
-      type: "state:save",
-    }),
-
-  saveStateResponse: (windows: unknown[]) =>
-    ipcRenderer.invoke("state:saveResponse", windows),
+  saveStateResponse: (windows: WindowMetadata[]) =>
+    ipcRenderer.invoke(IpcChannel.stateSaveResponse, windows),
 
   saveTempFile: (name: string, buffer: ArrayBuffer) =>
-    ipcRenderer.invoke("dialog:saveTempFile", { buffer, name }),
+    ipcRenderer.invoke(IpcChannel.dialogSaveTempFile, { buffer, name }),
 
-  sendCommand: (command: unknown) =>
-    ipcRenderer.invoke("katsu:command", command),
+  sendCommand: (command: IPCCommand) =>
+    ipcRenderer.invoke(IpcChannel.command, command),
 
   setBlockedCountHandler: (
     subscriberId: string,
     handler: (data: { count: number; origin: string }) => void
   ): (() => void) => {
-    _blockedCountSubscribers.set(subscriberId, handler);
+    blockedCountSubscribers.set(subscriberId, handler);
     return () => {
-      _blockedCountSubscribers.delete(subscriberId);
+      blockedCountSubscribers.delete(subscriberId);
     };
   },
 
-  setEventHandler: (handler: (event: unknown) => void) => {
-    _eventHandler = handler;
-  },
-
   setPermissionRequestHandler: (
-    handler: (request: {
-      id: string;
-      permission: string;
-      origin: string;
-      message: string;
-    }) => void
+    handler: (request: PermissionRequestPayload) => void
   ) => {
-    _permissionRequestHandler = handler;
+    permissionRequestHandler = handler;
   },
 
   setRequestSaveHandler: (handler: () => void) => {
-    _requestSaveHandler = handler;
+    requestSaveHandler = handler;
   },
 
-  setSettingsLoadedHandler: (handler: (settings: unknown) => void) => {
-    _settingsLoadedHandler = handler;
-    if (_settingsLoadedData) {
-      handler(_settingsLoadedData);
-      _settingsLoadedData = null;
+  setSettingsLoadedHandler: (handler: (settings: Settings) => void) => {
+    settingsLoadedHandler = handler;
+    if (settingsLoadedData !== null) {
+      handler(settingsLoadedData);
+      settingsLoadedData = null;
     }
   },
 
-  setStateLoadedHandler: (handler: (windows: unknown[]) => void) => {
-    _stateLoadedHandler = handler;
-    if (_stateLoadedData) {
-      handler(_stateLoadedData);
-      _stateLoadedData = null;
+  setStateLoadedHandler: (handler: (windows: WindowMetadata[]) => void) => {
+    stateLoadedHandler = handler;
+    if (stateLoadedData) {
+      handler(stateLoadedData);
+      stateLoadedData = null;
     }
   },
+
+  stageFile: (filePath: string) =>
+    ipcRenderer.invoke(IpcChannel.fsStageFile, filePath),
 });
