@@ -1,8 +1,15 @@
-import { Maximize, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Maximize, ShieldBan, X } from "lucide-react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Rnd } from "react-rnd";
 
 import { useWebviewEvents } from "../hooks/use-webview-events";
+import {
+  ARROW_DELTAS,
+  WEBVIEW_LIVE_CELL_RADIUS,
+  WINDOW_KEYBOARD_NUDGE_PX,
+} from "../lib/constants";
+import { useCameraStore } from "../store/camera-store";
+import { useSettingsStore } from "../store/settings-store";
 import { useWindowStore } from "../store/window-store";
 import type { Window as WindowData } from "../store/window-store";
 import { ErrorOverlay } from "./error-overlay";
@@ -11,17 +18,33 @@ import { FilePreview } from "./file-preview";
 const isWebUrl = (url: string) =>
   url.length > 0 && !url.startsWith("katsu://") && !url.startsWith("blob:");
 
+const absoluteFill: React.CSSProperties = {
+  border: "none",
+  height: "100%",
+  left: 0,
+  position: "absolute",
+  top: 0,
+  width: "100%",
+};
+
+interface WindowBodyProps {
+  isNearCamera: boolean;
+  loadError: string | null;
+  retry: () => void;
+  webviewRef: (element: Electron.WebviewTag | null) => void;
+  win: WindowData;
+  windowId: string;
+}
+
 const WindowBody = ({
+  isNearCamera,
   loadError,
+  retry,
   webviewRef,
   win,
   windowId,
-}: {
-  loadError: string | null;
-  webviewRef: React.RefObject<Electron.WebviewTag | null>;
-  win: WindowData;
-  windowId: string;
-}) => {
+}: WindowBodyProps) => {
+  const keepWindowsAlive = useSettingsStore((s) => s.settings.keepWindowsAlive);
   const isComponentPreview = win.previewType && win.previewType !== "pdf";
 
   return (
@@ -44,46 +67,52 @@ const WindowBody = ({
       {!isComponentPreview &&
         win.url &&
         !loadError &&
-        (win.previewType === "pdf" ? (
-          <iframe
-            src={win.url}
-            style={{
-              border: "none",
-              height: "100%",
-              left: 0,
-              position: "absolute",
-              top: 0,
-              width: "100%",
-            }}
-            title={win.fileName || "PDF Preview"}
-          />
-        ) : (
-          <webview
-            ref={webviewRef as React.RefObject<Electron.WebviewTag>}
-            src={win.url}
-            style={{
-              border: "none",
-              height: "100%",
-              left: 0,
-              position: "absolute",
-              top: 0,
-              width: "100%",
-            }}
-            preload={window.electronAPI.getWebviewPreloadPath()}
-            partition="persist:katsu"
-          />
-        ))}
+        (() => {
+          if (win.previewType === "pdf") {
+            // katsu:// PDFs are local staged files — the protocol handler only
+            // serves the drops dir. The viewer still runs sandboxed.
+            return (
+              <iframe
+                src={win.url}
+                sandbox="allow-scripts"
+                style={absoluteFill}
+                title={win.fileName || "PDF Preview"}
+              />
+            );
+          }
+          if (!isNearCamera && !keepWindowsAlive) {
+            return (
+              <div
+                style={{
+                  alignItems: "center",
+                  color: "#777",
+                  display: "flex",
+                  inset: 0,
+                  justifyContent: "center",
+                  padding: 12,
+                  position: "absolute",
+                  textAlign: "center",
+                }}
+              >
+                Suspended — return to this cell to reload
+              </div>
+            );
+          }
+          return (
+            <webview
+              ref={webviewRef}
+              src={win.url}
+              style={{
+                ...absoluteFill,
+                visibility: isNearCamera ? "visible" : "hidden",
+              }}
+              partition="persist:katsu"
+              webpreferences="contextIsolation=yes, sandbox=yes, nodeIntegration=no"
+            />
+          );
+        })()}
       {loadError && (
-        <ErrorOverlay
-          error={loadError}
-          url={win.url}
-          onRetry={() => {
-            const webview = webviewRef.current;
-            if (webview) {
-              webview.reload();
-            }
-          }}
-        />
+        <ErrorOverlay error={loadError} url={win.url} onRetry={retry} />
       )}
       {!win.url && !loadError && (
         <div
@@ -104,46 +133,86 @@ const WindowBody = ({
   );
 };
 
-export const Window = ({ windowId }: { windowId: string }) => {
+// eslint-disable-next-line prefer-arrow-callback -- named function for React devtools
+export const Window = memo(function Window({ windowId }: { windowId: string }) {
   const win = useWindowStore((s) => s.windows.find((w) => w.id === windowId));
   const updateWindow = useWindowStore((s) => s.updateWindow);
-  const activeWindowId = useWindowStore((s) => s.activeWindowId);
+  // Boolean selector: focus changes re-render only the two affected windows.
+  const isActive = useWindowStore((s) => s.activeWindowId === windowId);
   const setActiveWindow = useWindowStore((s) => s.setActiveWindow);
   const maximizeWindow = useWindowStore((s) => s.maximizeWindow);
   const bringToFront = useWindowStore((s) => s.bringToFront);
   const removeWindow = useWindowStore((s) => s.removeWindow);
-  const webviewRef = useRef<Electron.WebviewTag | null>(null);
   const [blockedCount, setBlockedCount] = useState(0);
 
-  const showAdPill = isWebUrl(win?.url ?? "");
-  const loadError = useWebviewEvents(windowId, webviewRef);
+  const { loadError, retry, webviewRef } = useWebviewEvents(windowId);
+
+  const winUrl = win?.url ?? "";
+  const showAdPill = isWebUrl(winUrl);
+
+  const winOrigin = useMemo(() => {
+    try {
+      return new URL(winUrl).origin;
+    } catch {
+      return null;
+    }
+  }, [winUrl]);
+
+  const isNearCamera = useCameraStore((s) => {
+    const w = useWindowStore.getState().windows.find((x) => x.id === windowId);
+    if (!w || !isWebUrl(w.url)) {
+      return true;
+    }
+    const cellX = Math.floor((w.x + w.w / 2) / s.grid.cellWidth);
+    const cellY = Math.floor((w.y + w.h / 2) / s.grid.cellHeight);
+    return (
+      Math.max(
+        Math.abs(cellX - s.currentCell.x),
+        Math.abs(cellY - s.currentCell.y)
+      ) <= WEBVIEW_LIVE_CELL_RADIUS
+    );
+  });
 
   useEffect(() => {
-    if (!showAdPill) {
+    if (!(showAdPill && winOrigin)) {
       return;
     }
-    const unsub = window.electronAPI.setBlockedCountHandler(
-      windowId,
-      (data) => {
-        try {
-          const winOrigin = new URL(win?.url ?? "").origin;
-          if (data.origin === winOrigin) {
-            setBlockedCount(data.count);
-          }
-        } catch {
-          // invalid URL
-        }
+    return window.electronAPI.setBlockedCountHandler(windowId, (data) => {
+      if (data.origin === winOrigin) {
+        setBlockedCount(data.count);
       }
-    );
-    return unsub;
-  }, [showAdPill, win?.url, windowId]);
+    });
+  }, [showAdPill, winOrigin, windowId]);
 
   if (!win) {
     return null;
   }
 
-  const isActive = activeWindowId === win.id;
   const displayName = win.fileName || win.url;
+
+  const handleTitlebarKeyDown = (e: React.KeyboardEvent) => {
+    const delta = ARROW_DELTAS[e.key];
+    if (!delta) {
+      return;
+    }
+    if (e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      updateWindow(win.id, {
+        x: win.x + delta[0] * WINDOW_KEYBOARD_NUDGE_PX,
+        y: win.y + delta[1] * WINDOW_KEYBOARD_NUDGE_PX,
+      });
+      return;
+    }
+    if (e.altKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      updateWindow(win.id, {
+        h: Math.max(120, win.h + delta[1] * WINDOW_KEYBOARD_NUDGE_PX),
+        w: Math.max(200, win.w + delta[0] * WINDOW_KEYBOARD_NUDGE_PX),
+      });
+    }
+  };
 
   return (
     <Rnd
@@ -183,10 +252,15 @@ export const Window = ({ windowId }: { windowId: string }) => {
         zIndex: win.z ?? 1,
       }}
     >
+      {/* Keyboard: Shift+Arrow moves, Alt+Arrow resizes. */}
       <div
         className={`titlebar flex h-9 items-center justify-between px-2.5 select-none ${
           isActive ? "bg-[#333]" : "bg-[#2a2a2a]"
         } text-[#ddd] cursor-grab`}
+        role="toolbar"
+        aria-label="Window controls"
+        tabIndex={0}
+        onKeyDown={handleTitlebarKeyDown}
       >
         <span className="w-10 shrink-0 opacity-50">{win.id.slice(0, 4)}</span>
         <span className="truncate text-center text-sm">{displayName}</span>
@@ -196,25 +270,14 @@ export const Window = ({ windowId }: { windowId: string }) => {
               className="mr-1 flex items-center gap-1 rounded-full bg-[#222] px-2 py-0.5 text-[10px] text-white/60"
               title={`${blockedCount} Ads Blocked`}
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-              </svg>
+              <ShieldBan size={10} />
               <span>{blockedCount}</span>
             </div>
           )}
           <button
             type="button"
             onClick={() => maximizeWindow(win.id)}
+            aria-label="Maximize window"
             className="flex h-5.5 w-5.5 items-center justify-center rounded-md text-[#aaa] transition hover:scale-105 hover:bg-white/10 hover:text-white"
           >
             <Maximize size={14} />
@@ -222,6 +285,7 @@ export const Window = ({ windowId }: { windowId: string }) => {
           <button
             type="button"
             onClick={() => removeWindow(win.id)}
+            aria-label="Close window"
             className="flex h-5.5 w-5.5 items-center justify-center rounded-md text-[#aaa] transition hover:scale-105 hover:bg-red-500/20 hover:text-red-400"
           >
             <X size={14} />
@@ -230,11 +294,13 @@ export const Window = ({ windowId }: { windowId: string }) => {
       </div>
 
       <WindowBody
+        isNearCamera={isNearCamera}
         loadError={loadError}
+        retry={retry}
         webviewRef={webviewRef}
         win={win}
         windowId={windowId}
       />
     </Rnd>
   );
-};
+});
