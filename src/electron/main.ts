@@ -1,12 +1,18 @@
 import path from "node:path";
 
 import * as Effect from "effect/Effect";
-import { app, BrowserWindow } from "electron";
+import * as Schema from "effect/Schema";
+import { app, BrowserWindow, protocol } from "electron";
 
+import type { WindowControlAction } from "../shared/contract.js";
 import { registerIpcHandlers } from "./ipc/handlers.js";
-import { MainLayer } from "./layers/main-layer.js";
+import { beginSaveAndQuit, quitInProgress } from "./quit-flow.js";
+import { mainRuntime } from "./runtime.js";
 import { AdBlocker } from "./services/ad-blocker.js";
-import { IPCRouter } from "./services/ipc-router.js";
+import {
+  decodeCommandPayload,
+  registerCommandHandler,
+} from "./services/ipc-router.js";
 import {
   cleanUserAgent,
   sendInitialState,
@@ -15,10 +21,24 @@ import {
   setupKatsuSession,
   setupWebContentsListeners,
 } from "./session/setup.js";
-import { isDev } from "./util.js";
+import { cleanDropsDir, isDev } from "./util.js";
 import { getMainWindow, setMainWindow } from "./window-manager.js";
 
-let isQuitting = false;
+// katsu:// is our own scheme: mark it standard/secure/stream-capable BEFORE
+// the app is ready so the protocol handler can stream preview media.
+protocol.registerSchemesAsPrivileged([
+  {
+    privileges: {
+      bypassCSP: false,
+      corsEnabled: true,
+      secure: true,
+      standard: true,
+      stream: true,
+      supportFetchAPI: true,
+    },
+    scheme: "katsu",
+  },
+]);
 
 app.userAgentFallback = cleanUserAgent;
 
@@ -28,7 +48,10 @@ app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 
 setupWebContentsListeners();
 
-const WINDOW_ACTIONS: Record<string, (win: BrowserWindow) => void> = {
+const WINDOW_ACTIONS: Record<
+  WindowControlAction,
+  (win: BrowserWindow) => void
+> = {
   close: (win) => win.close(),
   maximize: (win) => {
     if (win.isMaximized()) {
@@ -40,35 +63,48 @@ const WINDOW_ACTIONS: Record<string, (win: BrowserWindow) => void> = {
   minimize: (win) => win.minimize(),
 };
 
-app.on("ready", async () => {
-  // Initialize ad blocker before creating window
-  await Effect.runPromise(
-    Effect.gen(function* loadAdBlocker() {
-      const adBlocker = yield* AdBlocker;
-      return yield* adBlocker.init;
-    }).pipe(Effect.provide(MainLayer))
-  ).catch(() =>
-    console.warn("Ad blocker failed to initialize, continuing without it")
-  );
+const WindowControlPayloadSchema = Schema.Union(
+  Schema.Literal("minimize"),
+  Schema.Literal("maximize"),
+  Schema.Literal("close")
+);
 
-  // Initialize window:control handler in the IPC router
-  Effect.runSync(
-    Effect.gen(function* initRouter() {
-      const router = yield* IPCRouter;
-      return yield* router.registerHandler("window:control", (payload) =>
-        Effect.sync(() => {
-          const action = payload as string;
-          const win = getMainWindow();
-          if (!win) {
-            return;
-          }
-          WINDOW_ACTIONS[action]?.(win);
-        })
+const registerWindowControlHandler = (): void => {
+  registerCommandHandler("window:control", (payload) =>
+    Effect.gen(function* windowControl() {
+      const action = yield* decodeCommandPayload(
+        WindowControlPayloadSchema,
+        payload,
+        "window:control"
       );
-    }).pipe(Effect.provide(MainLayer))
+      const win = getMainWindow();
+      if (win) {
+        WINDOW_ACTIONS[action]?.(win);
+      }
+      return { done: action };
+    })
   );
+};
+
+const initAdBlockerLazy = (): void => {
+  void mainRuntime
+    .runPromise(
+      Effect.gen(function* loadAdBlocker() {
+        const adBlocker = yield* AdBlocker;
+        return yield* adBlocker.init;
+      })
+    )
+    .catch(() =>
+      console.warn("Ad blocker failed to initialize, continuing without it")
+    );
+};
+
+app.on("ready", async () => {
+  // Wipe preview drops orphaned by a previous run before anything can serve them.
+  await mainRuntime.runPromise(cleanDropsDir());
 
   registerIpcHandlers();
+  registerWindowControlHandler();
   setupDefaultProtocol();
 
   const mainWindow = new BrowserWindow({
@@ -78,7 +114,12 @@ app.on("ready", async () => {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: path.join(app.getAppPath(), "dist-electron", "preload.js"),
+      preload: path.join(
+        app.getAppPath(),
+        "dist-electron",
+        "electron",
+        "preload.js"
+      ),
       sandbox: false,
       webviewTag: true,
     },
@@ -98,24 +139,39 @@ app.on("ready", async () => {
   const katsuSession = setupKatsuSession();
   setupAdBlocking(katsuSession);
 
-  mainWindow.webContents.once("did-finish-load", sendInitialState);
+  // Send state on EVERY finished load so dev HMR/full reloads re-hydrate.
+  let adBlockInitStarted = false;
+  mainWindow.webContents.on("did-finish-load", () => {
+    void sendInitialState();
+    if (!adBlockInitStarted) {
+      adBlockInitStarted = true;
+      // Defer ad-blocker init until after first paint — it must not block
+      // window creation. Requests fail open until the engine is ready.
+      initAdBlockerLazy();
+    }
+  });
+
+  // Intercept the close BEFORE the window is destroyed: `closed` would null
+  // the window first and `before-quit` fires too late to ask for state.
+  mainWindow.on("close", (event) => {
+    if (quitInProgress()) {
+      return;
+    }
+    event.preventDefault();
+    beginSaveAndQuit();
+  });
 
   mainWindow.on("closed", () => {
     setMainWindow(null);
   });
 });
 
-app.on("before-quit", async () => {
-  if (isQuitting) {
+app.on("before-quit", (event) => {
+  if (quitInProgress()) {
     return;
   }
-  isQuitting = true;
-
-  const win = getMainWindow();
-  if (win && !win.isDestroyed()) {
-    win.webContents.send("state:requestSave");
-    await Effect.runPromise(Effect.sleep("500 millis"));
-  }
+  event.preventDefault();
+  beginSaveAndQuit();
 });
 
 app.on("window-all-closed", () => {
