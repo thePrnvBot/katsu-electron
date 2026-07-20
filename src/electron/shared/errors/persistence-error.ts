@@ -1,15 +1,12 @@
-export class PersistenceError extends Error {
-  readonly _tag:
-    | "ReadFailed"
-    | "WriteFailed"
-    | "ParseFailed"
-    | "AtomicRenameFailed";
-  readonly cause?: unknown;
+import * as Data from "effect/Data";
 
-  constructor(tag: PersistenceError["_tag"], cause?: unknown) {
-    super(`PersistenceError: ${tag}`);
-    this.name = "PersistenceError";
-    this._tag = tag;
-    this.cause = cause;
-  }
-}
+export type PersistenceErrorReason =
+  | "ReadFailed"
+  | "WriteFailed"
+  | "ParseFailed"
+  | "AtomicRenameFailed";
+
+export class PersistenceError extends Data.TaggedError("PersistenceError")<{
+  readonly reason: PersistenceErrorReason;
+  readonly cause?: unknown;
+}> {}

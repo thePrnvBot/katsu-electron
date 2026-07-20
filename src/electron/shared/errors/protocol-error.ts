@@ -1,18 +1,12 @@
-export class ProtocolError extends Error {
-  readonly _tag:
-    | "FileNotFound"
-    | "PermissionDenied"
-    | "InvalidPath"
-    | "MimeDetectionFailed"
-    | "CacheError";
+import * as Data from "effect/Data";
+
+export type ProtocolErrorReason =
+  | "FileNotFound"
+  | "PermissionDenied"
+  | "InvalidPath";
+
+export class ProtocolError extends Data.TaggedError("ProtocolError")<{
+  readonly reason: ProtocolErrorReason;
   readonly path?: string;
   readonly cause?: unknown;
-
-  constructor(tag: ProtocolError["_tag"], path?: string, cause?: unknown) {
-    super(`ProtocolError: ${tag}`);
-    this.name = "ProtocolError";
-    this._tag = tag;
-    this.path = path;
-    this.cause = cause;
-  }
-}
+}> {}
