@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -6,7 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { app } from "electron";
 
-import { getUserData } from "../util.js";
+import { getAdBlockCacheFilePath } from "../util.js";
 
 const FILTER_LISTS = [
   {
@@ -39,8 +40,17 @@ const TYPE_MAP: Record<string, string> = {
   xhr: "xmlhttprequest",
 };
 
-const CACHE_FILE = getUserData("adblock-cache.json");
-const FILTERS_DIR = path.join(app.getAppPath(), "dist-electron", "filters");
+/**
+ * Bumped when the cache shape changes. Content changes to the bundled
+ * filter lists are caught by the content fingerprint instead.
+ */
+const CACHE_VERSION = 2;
+
+/** Bound per-origin blocked-count memory growth for long sessions. */
+const MAX_TRACKED_ORIGINS = 500;
+
+const getFiltersDir = (): string =>
+  path.join(app.getAppPath(), "dist-electron", "filters");
 
 export interface AdBlocker {
   readonly init: Effect.Effect<void, Error>;
@@ -69,36 +79,35 @@ let snfe: {
 } | null = null;
 const perOriginCounts = new Map<string, number>();
 
-const loadFromCache = async (): Promise<string | null> => {
-  try {
-    const data = await fs.readFile(CACHE_FILE, "utf-8");
-    const parsed = JSON.parse(data);
-    if (parsed.version === 1 && typeof parsed.selfie === "string") {
-      return parsed.selfie;
-    }
+export const originFromUrl = (raw: string): string | null => {
+  if (!raw) {
     return null;
+  }
+  try {
+    return new URL(raw).origin;
   } catch {
     return null;
   }
 };
 
-const saveToCache = async (selfie: string): Promise<void> => {
-  try {
-    await fs.writeFile(
-      CACHE_FILE,
-      JSON.stringify({ selfie, version: 1 }),
-      "utf-8"
-    );
-  } catch {
-    // non-critical
+const incrementBlockedCount = (origin: string): void => {
+  if (
+    !perOriginCounts.has(origin) &&
+    perOriginCounts.size >= MAX_TRACKED_ORIGINS
+  ) {
+    const oldest = perOriginCounts.keys().next().value;
+    if (oldest !== undefined) {
+      perOriginCounts.delete(oldest);
+    }
   }
+  perOriginCounts.set(origin, (perOriginCounts.get(origin) ?? 0) + 1);
 };
 
 const loadBundledLists = async (): Promise<{ name: string; raw: string }[]> => {
   const results = await Promise.all(
     FILTER_LISTS.map(async (list) => {
       try {
-        const filePath = path.join(FILTERS_DIR, list.file);
+        const filePath = path.join(getFiltersDir(), list.file);
         const raw = await fs.readFile(filePath, "utf-8");
         return { name: list.name, raw };
       } catch {
@@ -110,6 +119,57 @@ const loadBundledLists = async (): Promise<{ name: string; raw: string }[]> => {
   return results.filter((r): r is { name: string; raw: string } => r !== null);
 };
 
+/** Content fingerprint so bundled list updates invalidate the selfie cache. */
+const fingerprintLists = (lists: { name: string; raw: string }[]): string => {
+  const hash = crypto.createHash("sha256");
+  for (const list of lists) {
+    hash.update(list.name);
+    hash.update("\0");
+    hash.update(list.raw);
+    hash.update("\0");
+  }
+  return hash.digest("hex");
+};
+
+const loadCachedSelfie = async (
+  fingerprint: string
+): Promise<string | null> => {
+  try {
+    const data = await fs.readFile(getAdBlockCacheFilePath(), "utf-8");
+    const parsed: unknown = JSON.parse(data);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "version" in parsed &&
+      "fingerprint" in parsed &&
+      "selfie" in parsed &&
+      parsed.version === CACHE_VERSION &&
+      parsed.fingerprint === fingerprint &&
+      typeof parsed.selfie === "string"
+    ) {
+      return parsed.selfie;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const saveCachedSelfie = async (
+  fingerprint: string,
+  selfie: string
+): Promise<void> => {
+  try {
+    await fs.writeFile(
+      getAdBlockCacheFilePath(),
+      JSON.stringify({ fingerprint, selfie, version: CACHE_VERSION }),
+      "utf-8"
+    );
+  } catch {
+    // non-critical
+  }
+};
+
 export const AdBlockerLive = Layer.succeed(AdBlocker, {
   getBlockedCountForOrigin: (origin) =>
     Effect.sync(() => perOriginCounts.get(origin) ?? 0),
@@ -117,21 +177,24 @@ export const AdBlockerLive = Layer.succeed(AdBlocker, {
   init: Effect.tryPromise({
     catch: () => new Error("Failed to initialize ad blocker"),
     try: async () => {
+      const lists = await loadBundledLists();
+      if (lists.length === 0) {
+        return;
+      }
+
+      const fingerprint = fingerprintLists(lists);
       const { StaticNetFilteringEngine } = await import("@gorhill/ubo-core");
       snfe = await StaticNetFilteringEngine.create();
 
-      const cached = await loadFromCache();
+      const cached = await loadCachedSelfie(fingerprint);
       if (cached) {
         await snfe.deserialize(cached);
         return;
       }
 
-      const lists = await loadBundledLists();
-      if (lists.length > 0) {
-        await snfe.useLists(lists);
-        const selfie = await snfe.serialize();
-        await saveToCache(selfie);
-      }
+      await snfe.useLists(lists);
+      const selfie = await snfe.serialize();
+      await saveCachedSelfie(fingerprint, selfie);
     },
   }),
 
@@ -140,23 +203,23 @@ export const AdBlockerLive = Layer.succeed(AdBlocker, {
       if (!snfe) {
         return false;
       }
-      try {
-        const mappedType = TYPE_MAP[details.type] || details.type;
-        const blocked =
-          snfe.matchRequest({
-            method: details.method,
-            originURL: details.originURL,
-            type: mappedType,
-            url: details.url,
-          }) !== 0;
-        if (blocked) {
-          const { origin } = new URL(details.originURL);
-          perOriginCounts.set(origin, (perOriginCounts.get(origin) ?? 0) + 1);
+      const mappedType = TYPE_MAP[details.type] ?? details.type;
+      const blocked =
+        snfe.matchRequest({
+          method: details.method,
+          originURL: details.originURL,
+          type: mappedType,
+          url: details.url,
+        }) !== 0;
+      if (blocked) {
+        // originURL is "" for main-frame loads — never let URL parsing
+        // flip a block decision into an allow.
+        const origin = originFromUrl(details.originURL);
+        if (origin) {
+          incrementBlockedCount(origin);
         }
-        return blocked;
-      } catch {
-        return false;
       }
+      return blocked;
     }),
 
   resetBlockedCountForOrigin: (origin) =>
