@@ -17,8 +17,9 @@ export const AudioPreview = ({ fileName, url }: AudioPreviewProps) => (
     }}
   >
     <div style={{ color: "#ddd", fontSize: 14 }}>{fileName}</div>
-    <audio controls autoPlay src={url} style={{ width: "80%" }}>
-      <track kind="captions" label="Captions" src="" />
+    <audio controls src={url} style={{ width: "80%" }}>
+      {/* oxlint-disable-next-line jsx-a11y/media-has-caption -- user-provided media has no caption track */}
+      <track kind="captions" label="Captions" />
     </audio>
   </div>
 );

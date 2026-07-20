@@ -56,7 +56,7 @@ export const TextPreview = ({ fileName, url }: TextPreviewProps) => {
   if (content === null) {
     return (
       <PreviewPlaceholder
-        icon="📌"
+        icon="⏳"
         title={fileName}
         subtitle="Loading file content..."
       />

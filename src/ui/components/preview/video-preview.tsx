@@ -29,7 +29,6 @@ export const VideoPreview = ({
 
   return (
     <video
-      autoPlay
       controls
       onError={() => setError(true)}
       onLoadedMetadata={(e) =>
@@ -44,7 +43,8 @@ export const VideoPreview = ({
         width: "100%",
       }}
     >
-      <track kind="captions" label="Captions" src="" />
+      {/* oxlint-disable-next-line jsx-a11y/media-has-caption -- user-provided media has no caption track */}
+      <track kind="captions" label="Captions" />
     </video>
   );
 };
