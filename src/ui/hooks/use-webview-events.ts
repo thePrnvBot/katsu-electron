@@ -1,67 +1,70 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useMediaResize } from "../components/preview/use-media-resize";
 import { useWindowStore } from "../store/window-store";
 
-export const useWebviewEvents = (
-  windowId: string,
-  webviewRef: React.RefObject<Electron.WebviewTag | null>
-): string | null => {
+interface UseWebviewEventsResult {
+  loadError: string | null;
+  retry: () => void;
+  /** Callback ref: listeners attach the moment the element mounts. */
+  webviewRef: (element: Electron.WebviewTag | null) => void;
+}
+
+/**
+ * Attaches webview listeners via callback ref (not an effect), so listeners
+ * are in place before navigation starts and re-attach automatically when the
+ * element remounts (e.g. after Retry clears a load error).
+ */
+export const useWebviewEvents = (windowId: string): UseWebviewEventsResult => {
   const [loadError, setLoadError] = useState<string | null>(null);
-  const resizeMedia = useMediaResize(windowId);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
-    const webview = webviewRef.current;
-    if (!webview) {
-      return;
-    }
-
-    const { updateWindow } = useWindowStore.getState();
-
-    const handleTitle = (e: { title: string }) => {
-      updateWindow(windowId, { fileName: e.title });
-    };
-
-    const handleError = (e: {
-      isMainFrame: boolean;
-      errorCode: number;
-      errorDescription: string;
-    }) => {
-      if (!e.isMainFrame) {
+  const webviewRef = useCallback(
+    (element: Electron.WebviewTag | null) => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+      if (!element) {
         return;
       }
-      setLoadError(e.errorDescription || `Error ${e.errorCode}`);
-    };
 
-    const handleDidStartLoading = () => {
-      setLoadError(null);
-    };
+      const handleTitle = (e: Electron.PageTitleUpdatedEvent) => {
+        useWindowStore.getState().updateWindow(windowId, { fileName: e.title });
+      };
 
-    const handleWebviewMessage = (e: { channel: string; args: unknown[] }) => {
-      if (e.channel !== "webview:message") {
-        return;
-      }
-      const msg = e.args[0] as
-        | { type?: string; w?: number; h?: number }
-        | undefined;
-      if (!msg || msg.type !== "media-dimensions" || !msg.w || !msg.h) {
-        return;
-      }
-      resizeMedia(msg.w, msg.h);
-    };
+      const handleError = (e: Electron.DidFailLoadEvent) => {
+        if (!e.isMainFrame) {
+          return;
+        }
+        setLoadError(e.errorDescription || `Error ${e.errorCode}`);
+      };
 
-    webview.addEventListener("page-title-updated", handleTitle);
-    webview.addEventListener("did-fail-load", handleError);
-    webview.addEventListener("did-start-loading", handleDidStartLoading);
-    webview.addEventListener("ipc-message", handleWebviewMessage);
+      const handleDidStartLoading = () => {
+        setLoadError(null);
+      };
 
-    return () => {
-      webview.removeEventListener("page-title-updated", handleTitle);
-      webview.removeEventListener("did-fail-load", handleError);
-      webview.removeEventListener("did-start-loading", handleDidStartLoading);
-      webview.removeEventListener("ipc-message", handleWebviewMessage);
-    };
-  }, [windowId, webviewRef, resizeMedia]);
+      element.addEventListener("page-title-updated", handleTitle);
+      element.addEventListener("did-fail-load", handleError);
+      element.addEventListener("did-start-loading", handleDidStartLoading);
 
-  return loadError;
+      cleanupRef.current = () => {
+        element.removeEventListener("page-title-updated", handleTitle);
+        element.removeEventListener("did-fail-load", handleError);
+        element.removeEventListener("did-start-loading", handleDidStartLoading);
+      };
+    },
+    [windowId]
+  );
+
+  useEffect(
+    () => () => {
+      cleanupRef.current?.();
+    },
+    []
+  );
+
+  const retry = useCallback(() => {
+    // Clearing the error remounts the webview, which reloads `src` fresh.
+    setLoadError(null);
+  }, []);
+
+  return { loadError, retry, webviewRef };
 };
