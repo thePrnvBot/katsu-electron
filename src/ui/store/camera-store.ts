@@ -56,7 +56,7 @@ export const useCameraStore = create<CameraState>((set, get) => ({
   refreshGridSize: () =>
     set((s) => {
       const cellWidth = window.innerWidth;
-      const cellHeight = window.innerHeight - APP_TITLEBAR_HEIGHT;
+      const cellHeight = window.innerHeight;
       const cx = s.currentCell.x * cellWidth;
       const cy = s.currentCell.y * cellHeight;
       return {
