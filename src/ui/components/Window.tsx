@@ -5,6 +5,7 @@ import { Rnd } from "react-rnd";
 import { useWebviewEvents } from "../hooks/use-webview-events";
 import {
   ARROW_DELTAS,
+  PEEK_SCALE,
   WEBVIEW_LIVE_CELL_RADIUS,
   WINDOW_KEYBOARD_NUDGE_PX,
 } from "../lib/constants";
@@ -137,6 +138,7 @@ const WindowBody = ({
 export const Window = memo(function Window({ windowId }: { windowId: string }) {
   const win = useWindowStore((s) => s.windows.find((w) => w.id === windowId));
   const updateWindow = useWindowStore((s) => s.updateWindow);
+  const windowPeeking = useSettingsStore((s) => s.settings.windowPeeking);
   // Boolean selector: focus changes re-render only the two affected windows.
   const isActive = useWindowStore((s) => s.activeWindowId === windowId);
   const setActiveWindow = useWindowStore((s) => s.setActiveWindow);
@@ -223,6 +225,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
       enableResizing
       dragHandleClassName="titlebar"
       bounds={undefined}
+      scale={windowPeeking ? PEEK_SCALE : 1}
       onDragStart={() => {
         setActiveWindow(win.id);
         bringToFront(win.id);
