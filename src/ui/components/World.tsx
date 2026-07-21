@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
+import { useFileDrop } from "../hooks/use-file-drop";
 import {
   APP_TITLEBAR_HEIGHT,
   PEEK_SCALE,
@@ -15,13 +16,11 @@ interface WorldProps {
 
 /**
  * The world container transforms via direct DOM style writes driven by
- * zustand subscriptions — the camera animation loop (60 Hz) no longer
- * re-renders this component or its ~200 grid lines.
+ * zustand subscriptions — avoids re-rendering on every animation frame.
  */
 export const World = ({ children, onFileDrop }: WorldProps) => {
   const grid = useCameraStore((s) => s.grid);
-  const [dragOver, setDragOver] = useState(false);
-  const dragCounter = useRef(0);
+  const { dragOver, dragHandlers } = useFileDrop({ onFileDrop });
   const worldRef = useRef<HTMLDivElement>(null);
 
   const worldW = grid.cols * grid.cellWidth;
@@ -49,78 +48,10 @@ export const World = ({ children, onFileDrop }: WorldProps) => {
     };
   }, []);
 
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounter.current += 1;
-    setDragOver(true);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-  }, []);
-
-  const handleDragLeave = useCallback((_e: React.DragEvent) => {
-    dragCounter.current -= 1;
-    if (dragCounter.current === 0) {
-      setDragOver(false);
-    }
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      dragCounter.current = 0;
-      setDragOver(false);
-      const files = [...e.dataTransfer.files];
-      if (files.length > 0) {
-        onFileDrop(files);
-      }
-    },
-    [onFileDrop]
-  );
-
-  // Grid is static for a given grid size — rebuild only when dims change.
-  const gridLines = useMemo(
-    () => (
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full"
-        style={{ zIndex: 0 }}
-      >
-        {Array.from({ length: grid.cols + 1 }).map((_, i) => (
-          <line
-            key={`v${i}`}
-            x1={i * grid.cellWidth}
-            y1={0}
-            x2={i * grid.cellWidth}
-            y2={worldH}
-            stroke="rgba(255,255,255,0.06)"
-            strokeWidth={1}
-          />
-        ))}
-        {Array.from({ length: grid.rows + 1 }).map((_, i) => (
-          <line
-            key={`h${i}`}
-            x1={0}
-            y1={i * grid.cellHeight}
-            x2={worldW}
-            y2={i * grid.cellHeight}
-            stroke="rgba(255,255,255,0.06)"
-            strokeWidth={1}
-          />
-        ))}
-      </svg>
-    ),
-    [grid.cellHeight, grid.cellWidth, grid.cols, grid.rows, worldH, worldW]
-  );
-
   return (
     <div
       className="fixed inset-0 overflow-hidden bg-[#0a0a0a]"
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      {...dragHandlers}
     >
       {dragOver && (
         <div
@@ -137,6 +68,22 @@ export const World = ({ children, onFileDrop }: WorldProps) => {
         ref={worldRef}
         className="absolute left-0"
         style={{
+          backgroundImage: `
+            repeating-linear-gradient(
+              to right,
+              rgba(255,255,255,0.06) 0px,
+              rgba(255,255,255,0.06) 1px,
+              transparent 1px,
+              transparent ${grid.cellWidth}px
+            ),
+            repeating-linear-gradient(
+              to bottom,
+              rgba(255,255,255,0.06) 0px,
+              rgba(255,255,255,0.06) 1px,
+              transparent 1px,
+              transparent ${grid.cellHeight}px
+            )
+          `,
           height: worldH,
           top: 0,
           transformOrigin: "0 0",
@@ -144,8 +91,6 @@ export const World = ({ children, onFileDrop }: WorldProps) => {
           willChange: "transform",
         }}
       >
-        {gridLines}
-
         <div className="relative" style={{ zIndex: 1 }}>
           {children}
         </div>
