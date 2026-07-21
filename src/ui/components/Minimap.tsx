@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 
 import { useAutoHide } from "../hooks/use-auto-hide";
+import { Z_MINIMAP } from "../lib/constants";
 import { useCameraStore } from "../store/camera-store";
+import { AutoHidePill } from "./auto-hide-pill";
 
 const CELL_SIZE = 14;
 const GAP = 1;
@@ -26,7 +28,7 @@ export const Minimap = () => {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).closest("[cmdk-root]")) {
+      if (e.target instanceof HTMLElement && e.target.closest("[cmdk-root]")) {
         return;
       }
       if (
@@ -46,14 +48,8 @@ export const Minimap = () => {
   const h = grid.rows * (CELL_SIZE + GAP);
 
   return (
-    <div className="fixed bottom-0 right-4 z-9999">
-      <div
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        className={`absolute bottom-0 left-1/2 h-3 w-16 -translate-x-1/2 rounded-t-full border border-white/10 border-b-0 bg-[#222] shadow-md shadow-black/30 transition-opacity ${
-          hidden ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-      />
+    <div className="fixed bottom-0 right-4" style={{ zIndex: Z_MINIMAP }}>
+      <AutoHidePill hidden={hidden} onShow={show} position="bottom" />
 
       <div
         onMouseEnter={handleMouseEnter}
