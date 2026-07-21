@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { PreviewType } from "../../shared/contract";
+import type { Bounds, PreviewType } from "../../shared/contract";
 import {
   DEFAULT_WINDOW_HEIGHT,
   DEFAULT_WINDOW_WIDTH,
@@ -11,13 +11,6 @@ import { revokePreviewUrl } from "../utils/file-preview";
 import type { WindowLayout } from "../utils/window-layouts";
 import { resolveLayout } from "../utils/window-layouts";
 import { useCameraStore } from "./camera-store";
-
-export interface Bounds {
-  readonly x: number;
-  readonly y: number;
-  readonly w: number;
-  readonly h: number;
-}
 
 export interface Window {
   readonly id: string;
@@ -63,63 +56,68 @@ export const useWindowStore = create<WindowState>((set) => ({
     }),
   maximizeWindow: (id) =>
     set((s) => {
-      const w = s.windows.find((x) => x.id === id);
-      if (!w) {
+      const currentWindow = s.windows.find((window) => window.id === id);
+      if (!currentWindow) {
         return s;
       }
 
-      if (w.maximized) {
-        const pb = w.prevBounds ?? {
-          h: DEFAULT_WINDOW_HEIGHT,
-          w: DEFAULT_WINDOW_WIDTH,
+      if (currentWindow.maximized) {
+        const pb = currentWindow.prevBounds ?? {
+          height: DEFAULT_WINDOW_HEIGHT,
+          width: DEFAULT_WINDOW_WIDTH,
           x: DEFAULT_WINDOW_X,
           y: DEFAULT_WINDOW_Y,
         };
         return {
-          windows: s.windows.map((x) =>
-            x.id === id
+          windows: s.windows.map((window) =>
+            window.id === id
               ? {
-                  ...x,
-                  h: pb.h,
+                  ...window,
+                  h: pb.height,
                   maximized: false,
                   prevBounds: undefined,
-                  w: pb.w,
+                  w: pb.width,
                   x: pb.x,
                   y: pb.y,
                 }
-              : x
+              : window
           ),
         };
       }
 
-      const { currentCell, grid } = useCameraStore.getState();
-      const cx = currentCell.x * grid.cellWidth;
-      const cy = currentCell.y * grid.cellHeight;
+      const { camera, grid } = useCameraStore.getState();
+      const cx = camera.x;
+      const cy = camera.y;
       return {
-        windows: s.windows.map((x) =>
-          x.id === id
+        windows: s.windows.map((window) =>
+          window.id === id
             ? {
-                ...x,
+                ...window,
                 h: grid.cellHeight,
                 maximized: true,
-                prevBounds: { h: x.h, w: x.w, x: x.x, y: x.y },
+                prevBounds: {
+                  height: window.h,
+                  width: window.w,
+                  x: window.x,
+                  y: window.y,
+                },
                 w: grid.cellWidth,
                 x: cx,
                 y: cy,
               }
-            : x
+            : window
         ),
       };
     }),
   removeWindow: (id) =>
     set((s) => {
-      const win = s.windows.find((w) => w.id === id);
-      if (win) {
-        revokePreviewUrl(win.url);
+      const currentWindow = s.windows.find((window) => window.id === id);
+      if (currentWindow) {
+        revokePreviewUrl(currentWindow.url);
       }
       return {
         activeWindowId: s.activeWindowId === id ? null : s.activeWindowId,
-        windows: s.windows.filter((w) => w.id !== id),
+        windows: s.windows.filter((window) => window.id !== id),
       };
     }),
   setActiveWindow: (id) => set({ activeWindowId: id }),
@@ -130,23 +128,25 @@ export const useWindowStore = create<WindowState>((set) => ({
     const cy = currentCell.y * grid.cellHeight;
 
     set((s) => ({
-      windows: s.windows.map((w) =>
-        w.id === id
+      windows: s.windows.map((window) =>
+        window.id === id
           ? {
-              ...w,
-              h: bounds.h,
+              ...window,
+              h: bounds.height,
               maximized: false,
-              w: bounds.w,
+              w: bounds.width,
               x: cx + bounds.x,
               y: cy + bounds.y,
             }
-          : w
+          : window
       ),
     }));
   },
   updateWindow: (id, patch) =>
     set((s) => ({
-      windows: s.windows.map((w) => (w.id === id ? { ...w, ...patch } : w)),
+      windows: s.windows.map((window) =>
+        window.id === id ? { ...window, ...patch } : window
+      ),
     })),
   windows: [],
 }));
