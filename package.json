@@ -18,7 +18,8 @@
     "dist:linux": "pnpm transpile:electron && pnpm build && electron-builder --linux --x64",
     "check": "ultracite check",
     "fix": "ultracite fix",
-    "knip": "knip"
+    "knip": "knip",
+    "cloc": "cloc --exclude-ext txt ./src"
   },
   "dependencies": {
     "@gorhill/ubo-core": "^0.1.30",
