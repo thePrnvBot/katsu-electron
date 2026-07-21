@@ -7,8 +7,8 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { getDropsDir, isPathInside } from "../util.js";
 import { ProtocolError } from "../shared/errors/protocol-error.js";
+import { getDropsDir, isPathInside } from "../util.js";
 
 export interface ProtocolHandler {
   readonly handleRequest: (

@@ -1,4 +1,4 @@
-import type { PreviewType } from "../utils/file-preview";
+import type { PreviewType } from "../../shared/contract";
 import { AudioPreview } from "./preview/audio-preview";
 import { DownloadPreview } from "./preview/download-preview";
 import { ImagePreview } from "./preview/image-preview";

@@ -5,10 +5,9 @@ import * as Schema from "effect/Schema";
 
 import type { IPCCommand } from "../../shared/contract.js";
 import { IPCCommandSchema, SettingsSchema } from "../schemas/ipc-schemas.js";
-
+import { IPCError } from "../shared/errors/ipc-error.js";
 import { Permissions } from "./permissions.js";
 import { Persistence } from "./persistence.js";
-import { IPCError } from "../shared/errors/ipc-error.js";
 
 type CommandServices = Permissions | Persistence;
 

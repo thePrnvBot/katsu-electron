@@ -4,9 +4,9 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import type { PermissionRequestPayload } from "../../shared/contract.js";
 import { IpcChannel } from "../../shared/ipc-channels.js";
 import { getMainWindow } from "../window-manager.js";
-import { PermissionRequestPayload } from "../../shared/contract.js";
 
 const REQUEST_TIMEOUT_MS = 60_000;
 

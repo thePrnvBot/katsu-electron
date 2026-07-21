@@ -1,4 +1,4 @@
-import type { Bounds } from "../store/window-store";
+import type { Bounds } from "../../shared/contract";
 
 export type WindowLayout =
   | "left_half"
@@ -25,31 +25,31 @@ export const resolveLayout = (
 
   switch (layout) {
     case "left_half": {
-      return { h: cvh, w: halfW, x: 0, y: 0 };
+      return { height: cvh, width: halfW, x: 0, y: 0 };
     }
     case "right_half": {
-      return { h: cvh, w: halfW, x: halfW, y: 0 };
+      return { height: cvh, width: halfW, x: halfW, y: 0 };
     }
     case "left_third": {
-      return { h: cvh, w: thirdW, x: 0, y: 0 };
+      return { height: cvh, width: thirdW, x: 0, y: 0 };
     }
     case "center_third": {
-      return { h: cvh, w: thirdW, x: thirdW, y: 0 };
+      return { height: cvh, width: thirdW, x: thirdW, y: 0 };
     }
     case "right_third": {
-      return { h: cvh, w: thirdW, x: thirdW * 2, y: 0 };
+      return { height: cvh, width: thirdW, x: thirdW * 2, y: 0 };
     }
     case "top_left_quarter": {
-      return { h: quarterH, w: quarterW, x: 0, y: 0 };
+      return { height: quarterH, width: quarterW, x: 0, y: 0 };
     }
     case "top_right_quarter": {
-      return { h: quarterH, w: quarterW, x: quarterW, y: 0 };
+      return { height: quarterH, width: quarterW, x: quarterW, y: 0 };
     }
     case "bottom_left_quarter": {
-      return { h: quarterH, w: quarterW, x: 0, y: quarterH };
+      return { height: quarterH, width: quarterW, x: 0, y: quarterH };
     }
     case "bottom_right_quarter": {
-      return { h: quarterH, w: quarterW, x: quarterW, y: quarterH };
+      return { height: quarterH, width: quarterW, x: quarterW, y: quarterH };
     }
     default: {
       throw new Error(`Unknown layout: ${layout satisfies never}`);

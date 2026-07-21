@@ -8,13 +8,12 @@ import * as Schema from "effect/Schema";
 import type { Settings, WindowMetadata } from "../../shared/contract.js";
 import { DEFAULT_SETTINGS } from "../../shared/contract.js";
 import { SettingsSchema, WindowsSchema } from "../schemas/ipc-schemas.js";
-
+import { PersistenceError } from "../shared/errors/persistence-error.js";
 import {
   getSettingsFilePath,
   getStateFilePath,
   writeFileAtomic,
 } from "../util.js";
-import { PersistenceError } from "../shared/errors/persistence-error.js";
 
 export interface Persistence {
   readonly loadState: Effect.Effect<readonly WindowMetadata[]>;
