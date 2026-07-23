@@ -33,6 +33,7 @@ interface WindowState {
   addWindow: (w: Window) => void;
   updateWindow: (id: string, patch: Partial<Window>) => void;
   removeWindow: (id: string) => void;
+  closeAllWindows: () => void;
   setActiveWindow: (id: string | null) => void;
   bringToFront: (id: string) => void;
   maximizeWindow: (id: string) => void;
@@ -120,6 +121,11 @@ export const useWindowStore = create<WindowState>((set) => ({
         windows: s.windows.filter((window) => window.id !== id),
       };
     }),
+  closeAllWindows: () =>
+    set(() => ({
+      windows: [],
+      activeWindowId: null
+    })),
   setActiveWindow: (id) => set({ activeWindowId: id }),
   setWindowLayout: (id, layout) => {
     const { grid, currentCell } = useCameraStore.getState();

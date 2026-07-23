@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import type { PreviewType } from "../shared/contract";
 import { CameraAnimator } from "./components/camera-animator";
-import { CommandMenu } from "./components/command-menu";
+import { CommandMenu } from "./components/command-menu/command-menu";
 import { Minimap } from "./components/minimap";
 import { PermissionDialog } from "./components/permission-dialog";
 import { SearchBar } from "./components/search-bar";
