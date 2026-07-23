@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 
-import { parsePermissionRequestPayload } from "../../shared/contract";
 import { Z_PERMISSION_DIALOG } from "../lib/constants";
 import { usePermissionStore } from "../store/permission-store";
 
@@ -17,11 +16,8 @@ export const PermissionDialog = () => {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
-    window.electronAPI.setPermissionRequestHandler((raw) => {
-      const parsed = parsePermissionRequestPayload(raw);
-      if (parsed) {
-        setRequest(parsed);
-      }
+    window.electronAPI.setPermissionRequestHandler((permissionRequestPayload) => {
+      setRequest(permissionRequestPayload);
     });
   }, [setRequest]);
 

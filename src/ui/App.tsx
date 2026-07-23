@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import type { PreviewType } from "../shared/contract";
-import { parseSettings, parseWindowMetadataArray } from "../shared/contract";
 import { CameraAnimator } from "./components/camera-animator";
 import { CommandMenu } from "./components/command-menu";
 import { Minimap } from "./components/minimap";
@@ -52,23 +51,23 @@ export const App = () => {
   // Load persisted state on mount — parsed at the boundary, no casts.
   useEffect(() => {
     window.electronAPI.setStateLoadedHandler((savedWindows) => {
-      for (const meta of parseWindowMetadataArray(savedWindows)) {
+      savedWindows.forEach((savedWindow) => {
         addWindow({
-          fileName: meta.title,
-          h: meta.bounds.height,
-          id: meta.id,
-          previewType: meta.previewType,
-          url: meta.url,
-          w: meta.bounds.width,
-          x: meta.bounds.x,
-          y: meta.bounds.y,
-          z: meta.zIndex,
+          fileName: savedWindow.title,
+          h: savedWindow.bounds.height,
+          id: savedWindow.id,
+          previewType: savedWindow.previewType,
+          url: savedWindow.url,
+          w: savedWindow.bounds.width,
+          x: savedWindow.bounds.x,
+          y: savedWindow.bounds.y,
+          z: savedWindow.zIndex,
         });
-      }
+      })
     });
 
     window.electronAPI.setSettingsLoadedHandler((savedSettings) => {
-      loadSettings(parseSettings(savedSettings));
+      loadSettings(savedSettings);
     });
   }, [addWindow, loadSettings]);
 
