@@ -56,6 +56,7 @@ export const App = () => {
           fileName: savedWindow.title,
           h: savedWindow.bounds.height,
           id: savedWindow.id,
+          kind: savedWindow.kind,
           previewType: savedWindow.previewType,
           url: savedWindow.url,
           w: savedWindow.bounds.width,
@@ -88,6 +89,7 @@ export const App = () => {
       const metadata = currentWindows.map((w) => ({
         bounds: { height: w.h, width: w.w, x: w.x, y: w.y },
         id: w.id,
+        kind: w.kind,
         previewType: w.previewType,
         title: w.fileName,
         url: w.url,
@@ -197,6 +199,28 @@ export const App = () => {
     activateWindow(newWindowId);
   };
 
+  const openTerminal = () => {
+    const newWindowId = crypto.randomUUID();
+    const { w, h } = computeWindowSize(
+      undefined,
+      undefined,
+      grid.cellWidth,
+      grid.cellHeight
+    );
+    const { x, y } = centerBoundsInCell(w, h, grid, currentCell);
+    addWindow({
+      fileName: "Terminal",
+      h,
+      id: newWindowId,
+      kind: "terminal",
+      url: "",
+      w,
+      x,
+      y,
+    });
+    activateWindow(newWindowId);
+  };
+
   const handleFileOpen = async (files: File[]) => {
     const previews = await Promise.all(files.map(createFilePreview));
     for (const preview of previews) {
@@ -221,7 +245,7 @@ export const App = () => {
     <div className="fixed inset-0 overflow-hidden">
       <CameraAnimator />
       <TitleBar />
-      <CommandMenu />
+      <CommandMenu openTerminal={openTerminal} />
       <SearchBar
         url={urlField}
         openSite={openSite}

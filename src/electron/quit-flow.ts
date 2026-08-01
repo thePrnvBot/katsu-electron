@@ -1,7 +1,9 @@
 import { app } from "electron";
+import * as Effect from "effect/Effect";
 
 import { IpcChannel } from "../shared/ipc-channels.js";
 import { mainRuntime } from "./runtime.js";
+import { TerminalService } from "./services/terminal.js";
 import { cleanDropsDir } from "./util.js";
 import { getMainWindow } from "./window-manager.js";
 
@@ -33,7 +35,13 @@ export const completeSaveAndQuit = (): void => {
     clearTimeout(timeout);
     timeout = null;
   }
-  void mainRuntime.runPromise(cleanDropsDir());
+  void mainRuntime.runPromise(
+    Effect.gen(function* cleanup() {
+      const terminals = yield* TerminalService;
+      yield* terminals.killAll();
+      yield* cleanDropsDir();
+    })
+  );
   app.quit();
 };
 

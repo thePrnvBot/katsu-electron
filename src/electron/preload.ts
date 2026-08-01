@@ -4,6 +4,10 @@ import type {
   IPCCommand,
   PermissionRequestPayload,
   Settings,
+  TerminalDataPayload,
+  TerminalExitPayload,
+  TerminalSpawnOptions,
+  TerminalSpawnResult,
   WindowMetadata,
 } from "../shared/contract.js";
 import { IpcChannel } from "../shared/ipc-channels.js";
@@ -16,6 +20,22 @@ ipcRenderer.on(IpcChannel.adblockCount, (_event, data) => {
   for (const handler of blockedCountSubscribers.values()) {
     handler(data);
   }
+});
+
+const terminalDataSubscribers = new Map<
+  string,
+  (data: TerminalDataPayload) => void
+>();
+ipcRenderer.on(IpcChannel.terminalData, (_event, data: TerminalDataPayload) => {
+  terminalDataSubscribers.get(data.id)?.(data);
+});
+
+const terminalExitSubscribers = new Map<
+  string,
+  (data: TerminalExitPayload) => void
+>();
+ipcRenderer.on(IpcChannel.terminalExit, (_event, data: TerminalExitPayload) => {
+  terminalExitSubscribers.get(data.id)?.(data);
 });
 
 let permissionRequestHandler:
@@ -113,6 +133,37 @@ contextBridge.exposeInMainWorld("electronAPI", {
     }
   },
 
+  setTerminalDataHandler: (
+    id: string,
+    handler: (data: TerminalDataPayload) => void
+  ): (() => void) => {
+    terminalDataSubscribers.set(id, handler);
+    return () => {
+      terminalDataSubscribers.delete(id);
+    };
+  },
+
+  setTerminalExitHandler: (
+    id: string,
+    handler: (data: TerminalExitPayload) => void
+  ): (() => void) => {
+    terminalExitSubscribers.set(id, handler);
+    return () => {
+      terminalExitSubscribers.delete(id);
+    };
+  },
+
   stageFile: (filePath: string) =>
     ipcRenderer.invoke(IpcChannel.fsStageFile, filePath),
+
+  terminalKill: (id: string) => ipcRenderer.invoke(IpcChannel.terminalKill, id),
+
+  terminalResize: (id: string, cols: number, rows: number) =>
+    ipcRenderer.invoke(IpcChannel.terminalResize, { cols, id, rows }),
+
+  terminalSpawn: (options: TerminalSpawnOptions): Promise<TerminalSpawnResult> =>
+    ipcRenderer.invoke(IpcChannel.terminalSpawn, options),
+
+  terminalWrite: (id: string, data: string) =>
+    ipcRenderer.invoke(IpcChannel.terminalWrite, { data, id }),
 });

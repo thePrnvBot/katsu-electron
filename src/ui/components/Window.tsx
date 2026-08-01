@@ -15,6 +15,7 @@ import { useWindowStore } from "../store/window-store";
 import type { Window as WindowData } from "../store/window-store";
 import { ErrorOverlay } from "./error-overlay";
 import { FilePreview } from "./file-preview";
+import { TerminalView } from "./terminal-view";
 
 const isWebUrl = (url: string) =>
   url.length > 0 && !url.startsWith("katsu://") && !url.startsWith("blob:");
@@ -46,6 +47,7 @@ const WindowBody = ({
   windowId,
 }: WindowBodyProps) => {
   const keepWindowsAlive = useSettingsStore((s) => s.settings.keepWindowsAlive);
+  const isTerminal = win.kind === "terminal";
   const isComponentPreview = win.previewType && win.previewType !== "pdf";
 
   return (
@@ -57,7 +59,8 @@ const WindowBody = ({
         position: "relative",
       }}
     >
-      {isComponentPreview && !loadError && (
+      {isTerminal && <TerminalView windowId={windowId} />}
+      {!isTerminal && isComponentPreview && !loadError && (
         <FilePreview
           fileName={win.fileName ?? ""}
           previewType={win.previewType}
@@ -65,7 +68,8 @@ const WindowBody = ({
           windowId={windowId}
         />
       )}
-      {!isComponentPreview &&
+      {!isTerminal &&
+        !isComponentPreview &&
         win.url &&
         !loadError &&
         (() => {
@@ -115,7 +119,7 @@ const WindowBody = ({
       {loadError && (
         <ErrorOverlay error={loadError} url={win.url} onRetry={retry} />
       )}
-      {!win.url && !loadError && (
+      {!isTerminal && !win.url && !loadError && (
         <div
           style={{
             alignItems: "center",

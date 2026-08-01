@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { Bounds, PreviewType } from "../../shared/contract";
+import type { Bounds, PreviewType, WindowKind } from "../../shared/contract";
 import {
   DEFAULT_WINDOW_HEIGHT,
   DEFAULT_WINDOW_WIDTH,
@@ -25,6 +25,8 @@ export interface Window {
   readonly maximized?: boolean;
   readonly prevBounds?: Bounds;
   readonly previewType?: PreviewType;
+  /** Defaults to "webview" when absent. */
+  readonly kind?: WindowKind;
 }
 
 interface WindowState {

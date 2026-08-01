@@ -16,6 +16,14 @@ export const IpcChannel = {
   stateLoaded: "state:loaded",
   stateRequestSave: "state:requestSave",
   stateSaveResponse: "state:saveResponse",
+  /** Main -> renderer push: PTY output for a given terminal id. */
+  terminalData: "terminal:data",
+  /** Main -> renderer push: PTY process exited. */
+  terminalExit: "terminal:exit",
+  terminalKill: "terminal:kill",
+  terminalResize: "terminal:resize",
+  terminalSpawn: "terminal:spawn",
+  terminalWrite: "terminal:write",
 } as const;
 
 export type IpcChannel = (typeof IpcChannel)[keyof typeof IpcChannel];

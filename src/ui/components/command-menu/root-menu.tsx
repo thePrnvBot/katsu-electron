@@ -5,9 +5,10 @@ import { useWindowStore } from "../../store/window-store";
 interface RootMenuProps {
   navigateToPage: (page: CommandPages) => void;
   closeAndResetMenu: () => void;
+  openTerminal: () => void;
 }
 
-export const RootMenu = ({ navigateToPage, closeAndResetMenu }: RootMenuProps) => {
+export const RootMenu = ({ navigateToPage, closeAndResetMenu, openTerminal }: RootMenuProps) => {
   const closeAllWindows = useWindowStore(
     (s) => s.closeAllWindows
   );
@@ -16,6 +17,11 @@ export const RootMenu = ({ navigateToPage, closeAndResetMenu }: RootMenuProps) =
     closeAllWindows();
     closeAndResetMenu();
   }
+
+  const handleOpenTerminal = () => {
+    openTerminal();
+    closeAndResetMenu();
+  };
 
   return (
   <>
@@ -39,6 +45,12 @@ export const RootMenu = ({ navigateToPage, closeAndResetMenu }: RootMenuProps) =
       className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
     >
       Settings
+    </Command.Item>
+    <Command.Item
+      onSelect={() => handleOpenTerminal()}
+      className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
+    >
+      New Terminal
     </Command.Item>
     <Command.Item
       onSelect={() => handleCloseAllWindows()}

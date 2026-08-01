@@ -23,6 +23,8 @@ export interface Bounds {
   readonly height: number;
 }
 
+export type WindowKind = "webview" | "terminal";
+
 export interface WindowMetadata {
   readonly id: string;
   readonly url: string;
@@ -30,6 +32,8 @@ export interface WindowMetadata {
   readonly zIndex: number;
   readonly title?: string;
   readonly previewType?: PreviewType;
+  /** Defaults to "webview" when absent — keeps old persisted state valid. */
+  readonly kind?: WindowKind;
 }
 
 export interface Settings {
@@ -52,6 +56,39 @@ export interface PermissionRequestPayload {
 export interface BlockedCountPayload {
   readonly count: number;
   readonly origin: string;
+}
+
+// --- Terminal (PTY) IPC payloads ---
+
+export interface TerminalSpawnOptions {
+  readonly cols: number;
+  readonly rows: number;
+  readonly cwd?: string;
+}
+
+export interface TerminalSpawnResult {
+  readonly id: string;
+}
+
+export interface TerminalWritePayload {
+  readonly id: string;
+  readonly data: string;
+}
+
+export interface TerminalResizePayload {
+  readonly id: string;
+  readonly cols: number;
+  readonly rows: number;
+}
+
+export interface TerminalDataPayload {
+  readonly id: string;
+  readonly data: string;
+}
+
+export interface TerminalExitPayload {
+  readonly id: string;
+  readonly exitCode: number;
 }
 
 // --- Command envelope (renderer -> main via IpcChannel.command) ---

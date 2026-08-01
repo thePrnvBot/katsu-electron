@@ -1,6 +1,7 @@
 {
   "appId": "com.thePrnvBot.katsu",
   "files": ["dist-electron", "dist-react"],
+  "asarUnpack": ["**/node_modules/node-pty/**"],
   "icon": "./desktopIcon.png",
   "mac": {
     "target": "dmg"

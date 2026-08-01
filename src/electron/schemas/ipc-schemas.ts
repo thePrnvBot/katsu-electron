@@ -7,7 +7,11 @@ import type {
   PreviewType,
   Settings,
   SettingsSaveCommand,
+  TerminalResizePayload,
+  TerminalSpawnOptions,
+  TerminalWritePayload,
   WindowControlCommand,
+  WindowKind,
   WindowMetadata,
 } from "../../shared/contract.js";
 
@@ -34,9 +38,15 @@ const PreviewTypeSchema: Schema.Schema<PreviewType> = Schema.Literal(
   "download"
 );
 
+const WindowKindSchema: Schema.Schema<WindowKind> = Schema.Literal(
+  "webview",
+  "terminal"
+);
+
 const WindowMetadataSchema: Schema.Schema<WindowMetadata> = Schema.Struct({
   bounds: BoundsSchema,
   id: Schema.String,
+  kind: Schema.optional(WindowKindSchema),
   previewType: Schema.optional(PreviewTypeSchema),
   title: Schema.optional(Schema.String),
   url: Schema.String,
@@ -82,3 +92,45 @@ export const IPCCommandSchema: Schema.Schema<IPCCommand> = Schema.Union(
   SettingsSaveCommandSchema,
   PermissionRespondCommandSchema
 );
+
+// --- Terminal (PTY) IPC payloads ---
+
+const MAX_TERMINAL_DIMENSION = 1000;
+
+export const TerminalSpawnOptionsSchema: Schema.Schema<TerminalSpawnOptions> =
+  Schema.Struct({
+    cols: Schema.Number.pipe(
+      Schema.int(),
+      Schema.positive(),
+      Schema.lessThanOrEqualTo(MAX_TERMINAL_DIMENSION)
+    ),
+    cwd: Schema.optional(Schema.String),
+    rows: Schema.Number.pipe(
+      Schema.int(),
+      Schema.positive(),
+      Schema.lessThanOrEqualTo(MAX_TERMINAL_DIMENSION)
+    ),
+  });
+
+export const TerminalWritePayloadSchema: Schema.Schema<TerminalWritePayload> =
+  Schema.Struct({
+    data: Schema.String,
+    id: Schema.String,
+  });
+
+export const TerminalResizePayloadSchema: Schema.Schema<TerminalResizePayload> =
+  Schema.Struct({
+    cols: Schema.Number.pipe(
+      Schema.int(),
+      Schema.positive(),
+      Schema.lessThanOrEqualTo(MAX_TERMINAL_DIMENSION)
+    ),
+    id: Schema.String,
+    rows: Schema.Number.pipe(
+      Schema.int(),
+      Schema.positive(),
+      Schema.lessThanOrEqualTo(MAX_TERMINAL_DIMENSION)
+    ),
+  });
+
+export const TerminalIdSchema = Schema.String;

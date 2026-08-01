@@ -13,7 +13,11 @@ export interface CloseProps {
 
 export type CommandPages = "root" | "windows" | "layout" | "settings";
 
-export const CommandMenu = () => {
+interface CommandMenuProps {
+  openTerminal: () => void;
+}
+
+export const CommandMenu = ({ openTerminal }: CommandMenuProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [pages, setPages] = useState<CommandPages[]>(["root"]);
@@ -94,7 +98,13 @@ export const CommandMenu = () => {
         className="h-10 w-full rounded-xl bg-[#333] px-4 text-sm text-[#eee] placeholder-white/40 outline-none"
       />
       <Command.List className="mt-2 max-h-64 overflow-y-auto">
-        {page === "root" && <RootMenu navigateToPage={navigateToPage} closeAndResetMenu={closeAndResetMenu}/>}
+        {page === "root" && (
+          <RootMenu
+            navigateToPage={navigateToPage}
+            closeAndResetMenu={closeAndResetMenu}
+            openTerminal={openTerminal}
+          />
+        )}
         {page === "windows" && (
           <WindowsMenu closeAndResetMenu={closeAndResetMenu} />
         )}
