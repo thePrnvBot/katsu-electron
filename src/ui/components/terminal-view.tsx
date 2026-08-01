@@ -1,4 +1,5 @@
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import { useEffect, useRef } from "react";
 
@@ -33,7 +34,10 @@ export const TerminalView = ({ windowId, cwd }: TerminalViewProps) => {
 
     exitedRef.current = false;
     const term = new Terminal({
+      // Draw block/box drawing chars as pixel-perfect shapes instead of font
+      // glyphs so ASCII art renders flush. Ignored by the DOM renderer.
       cursorBlink: true,
+      customGlyphs: true,
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
       fontSize: 13,
       theme: TERMINAL_THEME,
@@ -41,6 +45,15 @@ export const TerminalView = ({ windowId, cwd }: TerminalViewProps) => {
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(container);
+    // The DOM renderer (xterm 6 default) can't draw custom glyphs, so block and
+    // box drawing characters come from the font and leave seams. The WebGL
+    // renderer draws them as exact cell-filling shapes.
+    try {
+      term.loadAddon(new WebglAddon());
+    } catch {
+      // WebGL2 unavailable (e.g. GPU acceleration disabled) — fall back to the
+      // DOM renderer, which stays functional, just without custom glyphs.
+    }
     fitAddon.fit();
 
     let terminalId: string | null = null;
