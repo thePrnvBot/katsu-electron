@@ -54,6 +54,25 @@ export const TerminalView = ({ windowId, cwd }: TerminalViewProps) => {
       // WebGL2 unavailable (e.g. GPU acceleration disabled) — fall back to the
       // DOM renderer, which stays functional, just without custom glyphs.
     }
+    // xterm 6 already handles browser copy/paste events (writes the selection,
+    // brackets pasted text) — it just swallows Ctrl+C/V first. Let those keys
+    // fall through so the browser fires the events xterm listens for.
+    term.attachCustomKeyEventHandler((event) => {
+      if (event.type !== "keydown") {
+        return true;
+      }
+      const ctrl = event.ctrlKey || event.metaKey;
+      const key = event.key.toLowerCase();
+      // Ctrl+C copies only when something is selected; otherwise it falls
+      // through and stays the interrupt signal (^C).
+      if (ctrl && key === "c" && term.hasSelection()) {
+        return false;
+      }
+      if (ctrl && key === "v") {
+        return false;
+      }
+      return true;
+    });
     fitAddon.fit();
 
     let terminalId: string | null = null;
