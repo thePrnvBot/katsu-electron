@@ -32,12 +32,21 @@ export const Z_COMMAND_MENU = 99_999;
 export const WINDOW_KEYBOARD_NUDGE_PX = 10;
 
 /** Arrow key -> cell delta. Shared by camera navigation + window keyboard control. */
-export const ARROW_DELTAS: Record<string, readonly [number, number]> = {
+export const ARROW_DELTAS = {
   ArrowDown: [0, 1],
   ArrowLeft: [-1, 0],
   ArrowRight: [1, 0],
   ArrowUp: [0, -1],
-};
+} as const satisfies Record<string, readonly [number, number]>;
+
+export const isArrowKey = (
+  key: string
+): key is keyof typeof ARROW_DELTAS => key in ARROW_DELTAS;
+
+export const getArrowDelta = (
+  key: string
+): readonly [number, number] | undefined =>
+  isArrowKey(key) ? ARROW_DELTAS[key] : undefined;
 
 export const IMAGE_EXTENSIONS = new Set([
   "png",

@@ -48,10 +48,7 @@ app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 
 setupWebContentsListeners();
 
-const WINDOW_ACTIONS: Record<
-  WindowControlAction,
-  (win: BrowserWindow) => void
-> = {
+const WINDOW_ACTIONS = {
   close: (win) => win.close(),
   maximize: (win) => {
     if (win.isMaximized()) {
@@ -61,7 +58,7 @@ const WINDOW_ACTIONS: Record<
     }
   },
   minimize: (win) => win.minimize(),
-};
+} satisfies Record<WindowControlAction, (win: BrowserWindow) => void>;
 
 const WindowControlPayloadSchema = Schema.Union(
   Schema.Literal("minimize"),

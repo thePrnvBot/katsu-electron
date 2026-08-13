@@ -28,10 +28,8 @@ export const useCameraStore = create<CameraState>((set, get) => ({
   currentCell: { x: 0, y: 0 },
   grid: {
     cellHeight:
-      typeof window === "undefined"
-        ? 900 - APP_TITLEBAR_HEIGHT
-        : window.innerHeight - APP_TITLEBAR_HEIGHT,
-    cellWidth: typeof window === "undefined" ? 1400 : window.innerWidth,
+      (globalThis.window?.innerHeight ?? 900) - APP_TITLEBAR_HEIGHT,
+    cellWidth: globalThis.window?.innerWidth ?? 1400,
     cols: GRID_COLS,
     rows: GRID_ROWS,
   },

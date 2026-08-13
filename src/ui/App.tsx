@@ -10,7 +10,10 @@ import { SearchBar } from "./components/search-bar";
 import { TitleBar } from "./components/title-bar";
 import { Window } from "./components/window";
 import { World } from "./components/world";
-import { ARROW_DELTAS, WHEEL_CELL_THRESHOLD } from "./lib/constants";
+import {
+  getArrowDelta,
+  WHEEL_CELL_THRESHOLD,
+} from "./lib/constants";
 import { useCameraStore } from "./store/camera-store";
 import { usePermissionStore } from "./store/permission-store";
 import { useSettingsStore } from "./store/settings-store";
@@ -51,7 +54,7 @@ export const App = () => {
   // Load persisted state on mount — parsed at the boundary, no casts.
   useEffect(() => {
     window.electronAPI.setStateLoadedHandler((savedWindows) => {
-      savedWindows.forEach((savedWindow) => {
+      for (const savedWindow of savedWindows) {
         addWindow({
           fileName: savedWindow.title,
           h: savedWindow.bounds.height,
@@ -64,7 +67,7 @@ export const App = () => {
           y: savedWindow.bounds.y,
           z: savedWindow.zIndex,
         });
-      })
+      }
     });
 
     window.electronAPI.setSettingsLoadedHandler((savedSettings) => {
@@ -137,9 +140,9 @@ export const App = () => {
       if (usePermissionStore.getState().request) {
         return;
       }
-      const delta = ARROW_DELTAS[e.key];
+      const delta = getArrowDelta(e.key);
       if (delta) {
-        moveCell(...delta);
+        moveCell(delta[0], delta[1]);
       }
     };
     window.addEventListener("keydown", onKeyDown);

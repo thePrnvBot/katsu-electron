@@ -13,10 +13,10 @@ export const RootMenu = ({ navigateToPage, closeAndResetMenu, openTerminal }: Ro
     (s) => s.closeAllWindows
   );
 
-  function handleCloseAllWindows(): void {
+  const handleCloseAllWindows = (): void => {
     closeAllWindows();
     closeAndResetMenu();
-  }
+  };
 
   const handleOpenTerminal = () => {
     openTerminal();

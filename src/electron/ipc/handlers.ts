@@ -8,6 +8,13 @@ import { dialog, ipcMain } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 
 import { IpcChannel } from "../../shared/ipc-channels.js";
+import type {
+  IPCCommand,
+  TerminalResizePayload,
+  TerminalSpawnOptions,
+  TerminalWritePayload,
+  WindowMetadata,
+} from "../../shared/contract.js";
 import { completeSaveAndQuit } from "../quit-flow.js";
 import { mainRuntime } from "../runtime.js";
 import {
@@ -56,7 +63,7 @@ export const registerIpcHandlers = (): void => {
   registerBuiltinCommandHandlers();
 
   // Unified command router
-  ipcMain.handle(IpcChannel.command, async (event, command: unknown) => {
+  ipcMain.handle(IpcChannel.command, async (event, command: IPCCommand) => {
     try {
       assertMainWindowSender(event);
     } catch {
@@ -143,7 +150,9 @@ export const registerIpcHandlers = (): void => {
   );
 
   // Terminal: spawn a new PTY session, returns its id.
-  ipcMain.handle(IpcChannel.terminalSpawn, async (event, options: unknown) => {
+  ipcMain.handle(
+    IpcChannel.terminalSpawn,
+    async (event, options: TerminalSpawnOptions) => {
     assertMainWindowSender(event);
     return await mainRuntime.runPromise(
       Effect.gen(function* spawnTerminal() {
@@ -156,10 +165,13 @@ export const registerIpcHandlers = (): void => {
         return yield* terminals.spawn(parsed);
       })
     );
-  });
+    }
+  );
 
   // Terminal: write input into a PTY session.
-  ipcMain.handle(IpcChannel.terminalWrite, async (event, payload: unknown) => {
+  ipcMain.handle(
+    IpcChannel.terminalWrite,
+    async (event, payload: TerminalWritePayload) => {
     assertMainWindowSender(event);
     await mainRuntime.runPromise(
       Effect.gen(function* writeTerminal() {
@@ -172,10 +184,13 @@ export const registerIpcHandlers = (): void => {
         yield* terminals.write(parsed.id, parsed.data);
       })
     );
-  });
+    }
+  );
 
   // Terminal: resize a PTY session to match the renderer's fit-addon dims.
-  ipcMain.handle(IpcChannel.terminalResize, async (event, payload: unknown) => {
+  ipcMain.handle(
+    IpcChannel.terminalResize,
+    async (event, payload: TerminalResizePayload) => {
     assertMainWindowSender(event);
     await mainRuntime.runPromise(
       Effect.gen(function* resizeTerminal() {
@@ -188,10 +203,11 @@ export const registerIpcHandlers = (): void => {
         yield* terminals.resize(parsed.id, parsed.cols, parsed.rows);
       })
     );
-  });
+    }
+  );
 
   // Terminal: kill a PTY session (window close / unmount).
-  ipcMain.handle(IpcChannel.terminalKill, async (event, id: unknown) => {
+  ipcMain.handle(IpcChannel.terminalKill, async (event, id: string) => {
     assertMainWindowSender(event);
     await mainRuntime.runPromise(
       Effect.gen(function* killTerminal() {
@@ -209,7 +225,7 @@ export const registerIpcHandlers = (): void => {
   // closing all windows must persist as "no windows", not resurrect stale ones.
   ipcMain.handle(
     IpcChannel.stateSaveResponse,
-    async (event, windows: unknown) => {
+    async (event, windows: WindowMetadata[]) => {
       assertMainWindowSender(event);
       try {
         await mainRuntime.runPromise(

@@ -58,6 +58,11 @@ export const useWindowStore = create<WindowState>((set) => ({
         ),
       };
     }),
+  closeAllWindows: () =>
+    set(() => ({
+      activeWindowId: null,
+      windows: [],
+    })),
   maximizeWindow: (id) =>
     set((s) => {
       const currentWindow = s.windows.find((window) => window.id === id);
@@ -124,11 +129,6 @@ export const useWindowStore = create<WindowState>((set) => ({
         windows: s.windows.filter((window) => window.id !== id),
       };
     }),
-  closeAllWindows: () =>
-    set(() => ({
-      windows: [],
-      activeWindowId: null
-    })),
   setActiveWindow: (id) => set({ activeWindowId: id }),
   setWindowLayout: (id, layout) => {
     const { grid, currentCell } = useCameraStore.getState();

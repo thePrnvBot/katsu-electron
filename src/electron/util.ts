@@ -59,8 +59,8 @@ export const writeFileAtomic = <E>(
   filePath: string,
   content: string,
   errorFactory: {
-    rename: (err: unknown) => E;
-    write: (err: unknown) => E;
+    rename: (cause: unknown) => E;
+    write: (cause: unknown) => E;
   }
 ): Effect.Effect<void, E> =>
   Effect.gen(function* writeFileAtomicGen() {

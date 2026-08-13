@@ -144,10 +144,7 @@ export const TerminalView = ({ windowId, cwd }: TerminalViewProps) => {
       }
       term.dispose();
     };
-    // windowId/cwd are fixed for the lifetime of a window — re-running this
-    // effect would kill and respawn the shell, losing the session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cwd, windowId]);
 
   return (
     <div

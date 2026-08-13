@@ -5,6 +5,7 @@ import path from "node:path";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import { app } from "electron";
 
 import { getAdBlockCacheFilePath } from "../util.js";
@@ -32,19 +33,25 @@ const FILTER_LISTS = [
   },
 ];
 
-const TYPE_MAP: Record<string, string> = {
-  cspReport: "csp_report",
-  mainFrame: "main_frame",
-  subFrame: "sub_frame",
-  webSocket: "websocket",
-  xhr: "xmlhttprequest",
-};
+const TYPE_MAP = new Map([
+  ["cspReport", "csp_report"],
+  ["mainFrame", "main_frame"],
+  ["subFrame", "sub_frame"],
+  ["webSocket", "websocket"],
+  ["xhr", "xmlhttprequest"],
+]);
 
 /**
  * Bumped when the cache shape changes. Content changes to the bundled
  * filter lists are caught by the content fingerprint instead.
  */
 const CACHE_VERSION = 2;
+
+const CachedSelfieSchema = Schema.Struct({
+  fingerprint: Schema.String,
+  selfie: Schema.String,
+  version: Schema.Literal(CACHE_VERSION),
+});
 
 /** Bound per-origin blocked-count memory growth for long sessions. */
 const MAX_TRACKED_ORIGINS = 500;
@@ -137,17 +144,9 @@ const loadCachedSelfie = async (
   try {
     const data = await fs.readFile(getAdBlockCacheFilePath(), "utf-8");
     const parsed: unknown = JSON.parse(data);
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "version" in parsed &&
-      "fingerprint" in parsed &&
-      "selfie" in parsed &&
-      parsed.version === CACHE_VERSION &&
-      parsed.fingerprint === fingerprint &&
-      typeof parsed.selfie === "string"
-    ) {
-      return parsed.selfie;
+    const cache = Schema.decodeUnknownSync(CachedSelfieSchema)(parsed);
+    if (cache.fingerprint === fingerprint) {
+      return cache.selfie;
     }
     return null;
   } catch {
@@ -203,7 +202,7 @@ export const AdBlockerLive = Layer.succeed(AdBlocker, {
       if (!snfe) {
         return false;
       }
-      const mappedType = TYPE_MAP[details.type] ?? details.type;
+      const mappedType = TYPE_MAP.get(details.type) ?? details.type;
       const blocked =
         snfe.matchRequest({
           method: details.method,

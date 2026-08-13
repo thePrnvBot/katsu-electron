@@ -21,32 +21,32 @@ export const ProtocolHandler =
 
 const getMimeType = (filePath: string): string => {
   const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    ".css": "text/css",
-    ".gif": "image/gif",
-    ".go": "text/x-go",
-    ".html": "text/html",
-    ".jpeg": "image/jpeg",
-    ".jpg": "image/jpeg",
-    ".js": "text/javascript",
-    ".json": "application/json",
-    ".jsx": "text/javascript",
-    ".katsu-html": "text/html",
-    ".md": "text/markdown",
-    ".mp3": "audio/mpeg",
-    ".mp4": "video/mp4",
-    ".pdf": "application/pdf",
-    ".png": "image/png",
-    ".py": "text/x-python",
-    ".rs": "text/x-rust",
-    ".svg": "image/svg+xml",
-    ".ts": "text/typescript",
-    ".tsx": "text/typescript",
-    ".txt": "text/plain",
-    ".wav": "audio/wav",
-    ".webm": "video/webm",
-  };
-  return mimeTypes[ext] ?? "application/octet-stream";
+  const mimeTypes = new Map([
+    [".css", "text/css"],
+    [".gif", "image/gif"],
+    [".go", "text/x-go"],
+    [".html", "text/html"],
+    [".jpeg", "image/jpeg"],
+    [".jpg", "image/jpeg"],
+    [".js", "text/javascript"],
+    [".json", "application/json"],
+    [".jsx", "text/javascript"],
+    [".katsu-html", "text/html"],
+    [".md", "text/markdown"],
+    [".mp3", "audio/mpeg"],
+    [".mp4", "video/mp4"],
+    [".pdf", "application/pdf"],
+    [".png", "image/png"],
+    [".py", "text/x-python"],
+    [".rs", "text/x-rust"],
+    [".svg", "image/svg+xml"],
+    [".ts", "text/typescript"],
+    [".tsx", "text/typescript"],
+    [".txt", "text/plain"],
+    [".wav", "audio/wav"],
+    [".webm", "video/webm"],
+  ]);
+  return mimeTypes.get(ext) ?? "application/octet-stream";
 };
 
 interface ValidatedFile {
@@ -150,7 +150,7 @@ const webStream = (stream: Readable): ReadableStream<Uint8Array> => {
   });
 };
 
-const baseHeaders = (mimeType: string): Record<string, string> => ({
+const baseHeaders = (mimeType: string) => ({
   "Accept-Ranges": "bytes",
   "Content-Type": mimeType,
   "X-Content-Type-Options": "nosniff",

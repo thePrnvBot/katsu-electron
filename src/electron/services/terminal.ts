@@ -6,7 +6,11 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as pty from "node-pty";
 
-import type { TerminalSpawnOptions } from "../../shared/contract.js";
+import type {
+  TerminalDataPayload,
+  TerminalExitPayload,
+  TerminalSpawnOptions,
+} from "../../shared/contract.js";
 import { IpcChannel } from "../../shared/ipc-channels.js";
 import { TerminalError } from "../shared/errors/terminal-error.js";
 import { getMainWindow } from "../window-manager.js";
@@ -22,7 +26,12 @@ const resolveShell = (): string => {
 };
 
 /** Push a PTY event to the renderer — a no-op once the window is gone. */
-const sendToMainWindow = (channel: string, payload: unknown): void => {
+type TerminalEventPayload = TerminalDataPayload | TerminalExitPayload;
+
+const sendToMainWindow = (
+  channel: string,
+  payload: TerminalEventPayload
+): void => {
   const win = getMainWindow();
   if (win && !win.isDestroyed()) {
     win.webContents.send(channel, payload);
@@ -71,10 +80,15 @@ export const TerminalServiceLive = Layer.sync(TerminalService, () => {
       try: () => {
         const id = crypto.randomUUID();
         const shell = resolveShell();
+        const env = Object.fromEntries(
+          Object.entries(process.env).filter(
+            (entry): entry is [string, string] => entry[1] !== undefined
+          )
+        );
         const session = pty.spawn(shell, [], {
           cols: options.cols,
           cwd: options.cwd ?? os.homedir(),
-          env: process.env as Record<string, string>,
+          env,
           name: "xterm-256color",
           rows: options.rows,
         });

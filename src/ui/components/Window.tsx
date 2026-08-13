@@ -4,7 +4,7 @@ import { Rnd } from "react-rnd";
 
 import { useWebviewEvents } from "../hooks/use-webview-events";
 import {
-  ARROW_DELTAS,
+  getArrowDelta,
   PEEK_SCALE,
   WEBVIEW_LIVE_CELL_RADIUS,
   WINDOW_KEYBOARD_NUDGE_PX,
@@ -197,7 +197,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
   const displayName = win.fileName || win.url;
 
   const handleTitlebarKeyDown = (e: React.KeyboardEvent) => {
-    const delta = ARROW_DELTAS[e.key];
+    const delta = getArrowDelta(e.key);
     if (!delta) {
       return;
     }

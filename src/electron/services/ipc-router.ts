@@ -10,14 +10,15 @@ import { Permissions } from "./permissions.js";
 import { Persistence } from "./persistence.js";
 
 type CommandServices = Permissions | Persistence;
+type DecodableCommandInput = IPCCommand | IPCCommand["payload"];
 
 export type CommandHandler = (
-  payload: unknown
+  payload: IPCCommand["payload"]
 ) => Effect.Effect<unknown, IPCError, CommandServices>;
 
 export interface IPCRouter {
   readonly handleCommand: (
-    command: unknown
+    command: IPCCommand
   ) => Effect.Effect<unknown, IPCError, CommandServices>;
 }
 
@@ -37,9 +38,9 @@ export const registerCommandHandler = (
 };
 
 /** Parse a payload at the handler boundary — no casts. */
-export const decodeCommandPayload = <A, I>(
-  schema: Schema.Schema<A, I>,
-  value: unknown,
+export const decodeCommandPayload = <A>(
+  schema: Schema.Schema<A>,
+  value: DecodableCommandInput,
   command: string
 ): Effect.Effect<A, IPCError> =>
   Effect.try({
@@ -49,7 +50,7 @@ export const decodeCommandPayload = <A, I>(
   });
 
 export const IPCRouterLive = Layer.succeed(IPCRouter, {
-  handleCommand: (command: unknown) =>
+  handleCommand: (command: IPCCommand) =>
     Effect.gen(function* handleCommand() {
       const decoded = yield* decodeCommandPayload(
         IPCCommandSchema,

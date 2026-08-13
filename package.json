@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
+    "@oxlint/plugins": "1.78.0",
     "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
@@ -52,7 +53,7 @@
     "knip": "^6.26.0",
     "npm-run-all2": "^9.0.2",
     "oxfmt": "^0.58.0",
-    "oxlint": "^1.73.0",
+    "oxlint": "^1.78.0",
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.2",
     "ultracite": "7.9.3",
