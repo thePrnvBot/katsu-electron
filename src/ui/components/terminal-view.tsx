@@ -144,6 +144,9 @@ export const TerminalView = ({ windowId, cwd }: TerminalViewProps) => {
       }
       term.dispose();
     };
+    // NOTE: changing cwd/windowId re-runs this effect, which kills the PTY
+    // and respawns a fresh session (scrollback is lost). Only mount with
+    // stable values, or accept the session reset.
   }, [cwd, windowId]);
 
   return (
