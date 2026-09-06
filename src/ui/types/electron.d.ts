@@ -44,7 +44,9 @@ export interface ElectronAPI {
   /** Resize a PTY session to match the fit-addon's computed cols/rows. */
   terminalResize: (id: string, cols: number, rows: number) => Promise<void>;
   /** Spawn a new PTY session, returns its id. */
-  terminalSpawn: (options: TerminalSpawnOptions) => Promise<TerminalSpawnResult>;
+  terminalSpawn: (
+    options: TerminalSpawnOptions
+  ) => Promise<TerminalSpawnResult>;
   /** Write renderer input (keystrokes, paste) into a PTY session. */
   terminalWrite: (id: string, data: string) => Promise<void>;
   /** Subscribe to output for a given terminal id. Returns an unsubscribe fn. */

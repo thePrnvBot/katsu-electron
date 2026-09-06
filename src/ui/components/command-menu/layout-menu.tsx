@@ -1,7 +1,8 @@
+import { Command } from "cmdk";
+
 import { useWindowStore } from "../../store/window-store";
 import type { WindowLayout } from "../../utils/window-layouts";
 import type { CloseProps } from "./command-menu";
-import { Command } from "cmdk";
 
 const LAYOUTS: { readonly key: WindowLayout; readonly label: string }[] = [
   { key: "left_half", label: "Left Half" },

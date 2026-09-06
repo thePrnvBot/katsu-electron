@@ -1,5 +1,5 @@
-import { app } from "electron";
 import * as Effect from "effect/Effect";
+import { app } from "electron";
 
 import { IpcChannel } from "../shared/ipc-channels.js";
 import { mainRuntime } from "./runtime.js";

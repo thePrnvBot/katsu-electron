@@ -39,9 +39,8 @@ export const ARROW_DELTAS = {
   ArrowUp: [0, -1],
 } as const satisfies Record<string, readonly [number, number]>;
 
-export const isArrowKey = (
-  key: string
-): key is keyof typeof ARROW_DELTAS => key in ARROW_DELTAS;
+export const isArrowKey = (key: string): key is keyof typeof ARROW_DELTAS =>
+  key in ARROW_DELTAS;
 
 export const getArrowDelta = (
   key: string

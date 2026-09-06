@@ -11,7 +11,7 @@ export const centerBoundsInCell = (
   h: number,
   grid: { cellWidth: number; cellHeight: number },
   cell: { x: number; y: number }
-)=> ({
+) => ({
   x: cell.x * grid.cellWidth + (grid.cellWidth - w) / 2,
   y: cell.y * grid.cellHeight + (grid.cellHeight - h) / 2,
 });

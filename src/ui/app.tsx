@@ -10,10 +10,7 @@ import { SearchBar } from "./components/search-bar";
 import { TitleBar } from "./components/title-bar";
 import { Window } from "./components/window";
 import { World } from "./components/world";
-import {
-  getArrowDelta,
-  WHEEL_CELL_THRESHOLD,
-} from "./lib/constants";
+import { getArrowDelta, WHEEL_CELL_THRESHOLD } from "./lib/constants";
 import { useCameraStore } from "./store/camera-store";
 import { usePermissionStore } from "./store/permission-store";
 import { useSettingsStore } from "./store/settings-store";

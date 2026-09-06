@@ -1,5 +1,6 @@
 import { Command } from "cmdk";
 import { Check } from "lucide-react";
+
 import { useCameraStore } from "../../store/camera-store";
 import { useSettingsStore } from "../../store/settings-store";
 import type { CloseProps } from "./command-menu";

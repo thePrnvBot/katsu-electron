@@ -16,9 +16,11 @@ export const PermissionDialog = () => {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
-    window.electronAPI.setPermissionRequestHandler((permissionRequestPayload) => {
-      setRequest(permissionRequestPayload);
-    });
+    window.electronAPI.setPermissionRequestHandler(
+      (permissionRequestPayload) => {
+        setRequest(permissionRequestPayload);
+      }
+    );
   }, [setRequest]);
 
   useEffect(() => {

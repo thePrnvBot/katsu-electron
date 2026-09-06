@@ -1,4 +1,5 @@
-import{ Command } from "cmdk";
+import { Command } from "cmdk";
+
 import { useCenterOnWindow } from "../../hooks/use-center-window";
 import { useWindowStore } from "../../store/window-store";
 import type { CloseProps } from "./command-menu";

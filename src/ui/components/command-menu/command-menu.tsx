@@ -2,10 +2,10 @@ import { Command } from "cmdk";
 import { useEffect, useState } from "react";
 
 import { Z_COMMAND_MENU } from "../../lib/constants";
-import { WindowsMenu } from "./windows-menu";
 import { LayoutMenu } from "./layout-menu";
-import { SettingsMenu } from "./settings-menu";
 import { RootMenu } from "./root-menu";
+import { SettingsMenu } from "./settings-menu";
+import { WindowsMenu } from "./windows-menu";
 
 export interface CloseProps {
   closeAndResetMenu: () => void;

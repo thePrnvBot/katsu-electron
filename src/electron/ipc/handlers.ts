@@ -7,7 +7,6 @@ import * as Schema from "effect/Schema";
 import { dialog, ipcMain } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 
-import { IpcChannel } from "../../shared/ipc-channels.js";
 import type {
   IPCCommand,
   TerminalResizePayload,
@@ -15,6 +14,7 @@ import type {
   TerminalWritePayload,
   WindowMetadata,
 } from "../../shared/contract.js";
+import { IpcChannel } from "../../shared/ipc-channels.js";
 import { completeSaveAndQuit } from "../quit-flow.js";
 import { mainRuntime } from "../runtime.js";
 import {
@@ -153,18 +153,18 @@ export const registerIpcHandlers = (): void => {
   ipcMain.handle(
     IpcChannel.terminalSpawn,
     async (event, options: TerminalSpawnOptions) => {
-    assertMainWindowSender(event);
-    return await mainRuntime.runPromise(
-      Effect.gen(function* spawnTerminal() {
-        const parsed = yield* Effect.try({
-          catch: () => new Error("invalid terminal spawn options"),
-          try: () =>
-            Schema.decodeUnknownSync(TerminalSpawnOptionsSchema)(options),
-        });
-        const terminals = yield* TerminalService;
-        return yield* terminals.spawn(parsed);
-      })
-    );
+      assertMainWindowSender(event);
+      return await mainRuntime.runPromise(
+        Effect.gen(function* spawnTerminal() {
+          const parsed = yield* Effect.try({
+            catch: () => new Error("invalid terminal spawn options"),
+            try: () =>
+              Schema.decodeUnknownSync(TerminalSpawnOptionsSchema)(options),
+          });
+          const terminals = yield* TerminalService;
+          return yield* terminals.spawn(parsed);
+        })
+      );
     }
   );
 
@@ -172,18 +172,18 @@ export const registerIpcHandlers = (): void => {
   ipcMain.handle(
     IpcChannel.terminalWrite,
     async (event, payload: TerminalWritePayload) => {
-    assertMainWindowSender(event);
-    await mainRuntime.runPromise(
-      Effect.gen(function* writeTerminal() {
-        const parsed = yield* Effect.try({
-          catch: () => new Error("invalid terminal write payload"),
-          try: () =>
-            Schema.decodeUnknownSync(TerminalWritePayloadSchema)(payload),
-        });
-        const terminals = yield* TerminalService;
-        yield* terminals.write(parsed.id, parsed.data);
-      })
-    );
+      assertMainWindowSender(event);
+      await mainRuntime.runPromise(
+        Effect.gen(function* writeTerminal() {
+          const parsed = yield* Effect.try({
+            catch: () => new Error("invalid terminal write payload"),
+            try: () =>
+              Schema.decodeUnknownSync(TerminalWritePayloadSchema)(payload),
+          });
+          const terminals = yield* TerminalService;
+          yield* terminals.write(parsed.id, parsed.data);
+        })
+      );
     }
   );
 
@@ -191,18 +191,18 @@ export const registerIpcHandlers = (): void => {
   ipcMain.handle(
     IpcChannel.terminalResize,
     async (event, payload: TerminalResizePayload) => {
-    assertMainWindowSender(event);
-    await mainRuntime.runPromise(
-      Effect.gen(function* resizeTerminal() {
-        const parsed = yield* Effect.try({
-          catch: () => new Error("invalid terminal resize payload"),
-          try: () =>
-            Schema.decodeUnknownSync(TerminalResizePayloadSchema)(payload),
-        });
-        const terminals = yield* TerminalService;
-        yield* terminals.resize(parsed.id, parsed.cols, parsed.rows);
-      })
-    );
+      assertMainWindowSender(event);
+      await mainRuntime.runPromise(
+        Effect.gen(function* resizeTerminal() {
+          const parsed = yield* Effect.try({
+            catch: () => new Error("invalid terminal resize payload"),
+            try: () =>
+              Schema.decodeUnknownSync(TerminalResizePayloadSchema)(payload),
+          });
+          const terminals = yield* TerminalService;
+          yield* terminals.resize(parsed.id, parsed.cols, parsed.rows);
+        })
+      );
     }
   );
 

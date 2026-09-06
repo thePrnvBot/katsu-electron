@@ -161,7 +161,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   terminalResize: (id: string, cols: number, rows: number) =>
     ipcRenderer.invoke(IpcChannel.terminalResize, { cols, id, rows }),
 
-  terminalSpawn: (options: TerminalSpawnOptions): Promise<TerminalSpawnResult> =>
+  terminalSpawn: (
+    options: TerminalSpawnOptions
+  ): Promise<TerminalSpawnResult> =>
     ipcRenderer.invoke(IpcChannel.terminalSpawn, options),
 
   terminalWrite: (id: string, data: string) =>
