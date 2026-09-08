@@ -13,7 +13,7 @@
     "lint": "oxlint",
     "postinstall": "electron-rebuild -f -w node-pty || echo 'electron-rebuild skipped (node-pty N-API prebuild is ABI-compatible)'",
     "preview": "vite preview",
-    "transpile:electron": "tsc --project src/electron/tsconfig.json",
+    "transpile:electron": "tsc --project src/electron/tsconfig.json && node scripts/copy-filters.mjs",
     "dist:mac": "pnpm transpile:electron && pnpm build && electron-builder --mac --arm64",
     "dist:win": "pnpm transpile:electron && pnpm build && electron-builder --win --x64",
     "dist:linux": "pnpm transpile:electron && pnpm build && electron-builder --linux --x64",
