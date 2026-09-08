@@ -86,7 +86,12 @@ export const App = () => {
   useEffect(() => {
     window.electronAPI.setRequestSaveHandler(() => {
       const currentWindows = useWindowStore.getState().windows;
-      const metadata = currentWindows.map((w) => ({
+      // Preview windows reference blob:/katsu:// temp files that are wiped
+      // on relaunch — persisting them would only restore dead windows.
+      const persistable = currentWindows.filter(
+        (w) => w.previewType === undefined
+      );
+      const metadata = persistable.map((w) => ({
         bounds: { height: w.h, width: w.w, x: w.x, y: w.y },
         id: w.id,
         kind: w.kind,
