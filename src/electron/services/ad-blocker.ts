@@ -3,6 +3,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import * as Context from "effect/Context";
+import * as Data from "effect/Data";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -59,8 +61,34 @@ const MAX_TRACKED_ORIGINS = 500;
 const getFiltersDir = (): string =>
   path.join(app.getAppPath(), "dist-electron", "filters");
 
+export class AdBlockerError extends Data.TaggedError("AdBlockerError")<{
+  readonly reason: "InitFailed";
+  readonly cause: unknown;
+}> {}
+
+/** The subset of the uBO core engine the blocker uses. */
+interface FilterEngine {
+  matchRequest: (details: {
+    originURL: string;
+    url: string;
+    type: string;
+    method: string;
+  }) => number;
+  serialize: () => Promise<string>;
+  deserialize: (selfie: string) => Promise<void>;
+  useLists: (lists: { name: string; raw: string }[]) => Promise<void>;
+}
+
 export interface AdBlocker {
-  readonly init: Effect.Effect<void, Error>;
+  /**
+   * Load the filter engine (bundled lists + selfie cache). Single-flight:
+   * every caller awaits the same load, and a failed load stays failed.
+   */
+  readonly init: Effect.Effect<void, AdBlockerError>;
+  /**
+   * Fail-open until `init` completes — a request must never be held hostage
+   * by (or break because of) the blocker.
+   */
   readonly matchRequest: (details: {
     url: string;
     originURL: string;
@@ -73,19 +101,6 @@ export interface AdBlocker {
 
 export const AdBlocker = Context.GenericTag<AdBlocker>("AdBlocker");
 
-let snfe: {
-  matchRequest: (details: {
-    originURL: string;
-    url: string;
-    type: string;
-    method: string;
-  }) => number;
-  serialize: () => Promise<string>;
-  deserialize: (selfie: string) => Promise<void>;
-  useLists: (lists: { name: string; raw: string }[]) => Promise<void>;
-} | null = null;
-const perOriginCounts = new Map<string, number>();
-
 export const originFromUrl = (raw: string): string | null => {
   if (!raw) {
     return null;
@@ -95,19 +110,6 @@ export const originFromUrl = (raw: string): string | null => {
   } catch {
     return null;
   }
-};
-
-const incrementBlockedCount = (origin: string): void => {
-  if (
-    !perOriginCounts.has(origin) &&
-    perOriginCounts.size >= MAX_TRACKED_ORIGINS
-  ) {
-    const oldest = perOriginCounts.keys().next().value;
-    if (oldest !== undefined) {
-      perOriginCounts.delete(oldest);
-    }
-  }
-  perOriginCounts.set(origin, (perOriginCounts.get(origin) ?? 0) + 1);
 };
 
 const loadBundledLists = async (): Promise<{ name: string; raw: string }[]> => {
@@ -169,60 +171,115 @@ const saveCachedSelfie = async (
   }
 };
 
-export const AdBlockerLive = Layer.succeed(AdBlocker, {
-  getBlockedCountForOrigin: (origin) =>
-    Effect.sync(() => perOriginCounts.get(origin) ?? 0),
+export const AdBlockerLive = Layer.effect(
+  AdBlocker,
+  Effect.gen(function* makeAdBlocker() {
+    const perOriginCounts = new Map<string, number>();
+    let engine: FilterEngine | null = null;
 
-  init: Effect.tryPromise({
-    catch: () => new Error("Failed to initialize ad blocker"),
-    try: async () => {
-      const lists = await loadBundledLists();
-      if (lists.length === 0) {
-        return;
-      }
+    // Single-flight init: the first caller runs the load, everyone else
+    // awaits the same Deferred (success or failure).
+    const ready = yield* Deferred.make<null, AdBlockerError>();
+    let initStarted = false;
 
-      const fingerprint = fingerprintLists(lists);
-      const { StaticNetFilteringEngine } = await import("@gorhill/ubo-core");
-      snfe = await StaticNetFilteringEngine.create();
-
-      const cached = await loadCachedSelfie(fingerprint);
-      if (cached) {
-        await snfe.deserialize(cached);
-        return;
-      }
-
-      await snfe.useLists(lists);
-      const selfie = await snfe.serialize();
-      await saveCachedSelfie(fingerprint, selfie);
-    },
-  }),
-
-  matchRequest: (details) =>
-    Effect.sync(() => {
-      if (!snfe) {
-        return false;
-      }
-      const mappedType = TYPE_MAP.get(details.type) ?? details.type;
-      const blocked =
-        snfe.matchRequest({
-          method: details.method,
-          originURL: details.originURL,
-          type: mappedType,
-          url: details.url,
-        }) !== 0;
-      if (blocked) {
-        // originURL is "" for main-frame loads — never let URL parsing
-        // flip a block decision into an allow.
-        const origin = originFromUrl(details.originURL);
-        if (origin) {
-          incrementBlockedCount(origin);
+    const incrementBlockedCount = (origin: string): void => {
+      if (
+        !perOriginCounts.has(origin) &&
+        perOriginCounts.size >= MAX_TRACKED_ORIGINS
+      ) {
+        const oldest = perOriginCounts.keys().next().value;
+        if (oldest !== undefined) {
+          perOriginCounts.delete(oldest);
         }
       }
-      return blocked;
-    }),
+      perOriginCounts.set(origin, (perOriginCounts.get(origin) ?? 0) + 1);
+    };
 
-  resetBlockedCountForOrigin: (origin) =>
-    Effect.sync(() => {
-      perOriginCounts.delete(origin);
-    }),
-});
+    const loadEngine = (
+      lists: { name: string; raw: string }[]
+    ): Effect.Effect<void, AdBlockerError> =>
+      Effect.gen(function* runLoad() {
+        const fingerprint = fingerprintLists(lists);
+        const { StaticNetFilteringEngine } = yield* Effect.tryPromise({
+          catch: (cause) => new AdBlockerError({ cause, reason: "InitFailed" }),
+          try: () => import("@gorhill/ubo-core"),
+        });
+
+        const snfe: FilterEngine = yield* Effect.tryPromise({
+          catch: (cause) => new AdBlockerError({ cause, reason: "InitFailed" }),
+          try: async () => {
+            const created = await StaticNetFilteringEngine.create();
+            const cached = await loadCachedSelfie(fingerprint);
+            if (cached) {
+              await created.deserialize(cached);
+            } else {
+              await created.useLists(lists);
+              await saveCachedSelfie(fingerprint, await created.serialize());
+            }
+            return created;
+          },
+        });
+
+        engine = snfe;
+      });
+
+    const init: Effect.Effect<void, AdBlockerError> = Effect.suspend(() => {
+      if (initStarted) {
+        return Effect.asVoid(Deferred.await(ready));
+      }
+      initStarted = true;
+      return Effect.gen(function* runInit() {
+        const lists = yield* Effect.promise(() => loadBundledLists());
+        if (lists.length === 0) {
+          // Usually a packaging error (missing filter copy step) — say so.
+          console.warn(
+            "katsu: no bundled filter lists found, ad blocker disabled"
+          );
+          yield* Deferred.succeed(ready, null);
+          return;
+        }
+        yield* loadEngine(lists).pipe(
+          Effect.catchAll((error) =>
+            Effect.zipRight(Deferred.fail(ready, error), Effect.fail(error))
+          )
+        );
+        yield* Deferred.succeed(ready, null);
+      });
+    });
+
+    const matchRequest: AdBlocker["matchRequest"] = (details) =>
+      Effect.sync(() => {
+        if (!engine) {
+          return false;
+        }
+        const mappedType = TYPE_MAP.get(details.type) ?? details.type;
+        const blocked =
+          engine.matchRequest({
+            method: details.method,
+            originURL: details.originURL,
+            type: mappedType,
+            url: details.url,
+          }) !== 0;
+        if (blocked) {
+          // originURL is "" for main-frame loads — never let URL parsing
+          // flip a block decision into an allow.
+          const origin = originFromUrl(details.originURL);
+          if (origin) {
+            incrementBlockedCount(origin);
+          }
+        }
+        return blocked;
+      });
+
+    return {
+      getBlockedCountForOrigin: (origin) =>
+        Effect.sync(() => perOriginCounts.get(origin) ?? 0),
+      init,
+      matchRequest,
+      resetBlockedCountForOrigin: (origin) =>
+        Effect.sync(() => {
+          perOriginCounts.delete(origin);
+        }),
+    };
+  })
+);
