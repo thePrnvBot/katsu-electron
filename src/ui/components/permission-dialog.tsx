@@ -70,7 +70,7 @@ export const PermissionDialog = () => {
   return (
     <dialog
       ref={dialogRef}
-      className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="font-[Geist,system-ui,sans-serif] fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm"
       style={{ zIndex: Z_PERMISSION_DIALOG }}
       data-permission-dialog
       aria-labelledby="permission-dialog-title"
