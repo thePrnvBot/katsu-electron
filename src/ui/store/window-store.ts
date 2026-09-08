@@ -59,10 +59,15 @@ export const useWindowStore = create<WindowState>((set) => ({
       };
     }),
   closeAllWindows: () =>
-    set(() => ({
-      activeWindowId: null,
-      windows: [],
-    })),
+    set((s) => {
+      for (const w of s.windows) {
+        revokePreviewUrl(w.url);
+      }
+      return {
+        activeWindowId: null,
+        windows: [],
+      };
+    }),
   maximizeWindow: (id) =>
     set((s) => {
       const currentWindow = s.windows.find((window) => window.id === id);
