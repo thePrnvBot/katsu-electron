@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import * as Effect from "effect/Effect";
-import { app, BrowserWindow, protocol } from "electron";
+import { app, BrowserWindow, protocol, webContents } from "electron";
 
 import type { WindowControlAction } from "../shared/contract.js";
 import { registerIpcHandlers } from "./ipc/handlers.js";
@@ -39,9 +39,23 @@ protocol.registerSchemesAsPrivileged([
 
 app.userAgentFallback = cleanUserAgent;
 
-app.commandLine.appendSwitch("disable-renderer-backgrounding");
-app.commandLine.appendSwitch("disable-background-timer-throttling");
-app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+// NOTE: `disable-renderer-backgrounding` / `disable-background-timer-throttling`
+// / `disable-backgrounding-occluded-windows` are deliberately NOT set — on
+// Windows they route hidden-window rendering through Chromium's
+// `disable_hidden` patch path, which evicts hidden webview compositor frames
+// (electron/electron#42378): webviews go blank after windowed resize and
+// minimize/restore.
+
+// Chromium's Windows occlusion tracker races the restore animation: a
+// minimized/restored window can be marked occluded and keep serving a blank
+// compositor frame. webContents.invalidate() alone did not help in
+// electron/electron#42378 — the feature itself must be off.
+if (process.platform === "win32") {
+  app.commandLine.appendSwitch(
+    "disable-features",
+    "CalculateNativeWinOcclusion"
+  );
+}
 
 setupWebContentsListeners();
 
@@ -143,6 +157,20 @@ app.on("ready", async () => {
     // window creation. Requests fail open until the engine is ready; the
     // service makes repeat calls (dev reloads) single-flight no-ops.
     initAdBlockerLazy();
+  });
+
+  // Belt and suspenders: if the compositor still served stale/blank frames
+  // (occlusion race), a restore forces a full frame regeneration.
+  //
+  // Webview guests need this explicitly — the host's invalidate recovers
+  // the DOM, but guest compositor surfaces that were hidden during minimize
+  // stay blank until the guest itself is told to re-emit a frame.
+  mainWindow.on("restore", () => {
+    for (const contents of webContents.getAllWebContents()) {
+      if (!contents.isDestroyed()) {
+        contents.invalidate();
+      }
+    }
   });
 
   // Intercept the close BEFORE the window is destroyed: `closed` would null
