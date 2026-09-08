@@ -1,18 +1,15 @@
 import path from "node:path";
 
 import * as Effect from "effect/Effect";
-import * as Schema from "effect/Schema";
 import { app, BrowserWindow, protocol } from "electron";
 
 import type { WindowControlAction } from "../shared/contract.js";
 import { registerIpcHandlers } from "./ipc/handlers.js";
 import { beginSaveAndQuit, quitInProgress } from "./quit-flow.js";
 import { mainRuntime } from "./runtime.js";
+import { WindowControlPayloadSchema } from "./schemas/ipc-schemas.js";
 import { AdBlocker } from "./services/ad-blocker.js";
-import {
-  decodeCommandPayload,
-  registerCommandHandler,
-} from "./services/ipc-router.js";
+import { decodeCommandPayload, IPCRouter } from "./services/ipc-router.js";
 import {
   cleanUserAgent,
   sendInitialState,
@@ -60,25 +57,24 @@ const WINDOW_ACTIONS = {
   minimize: (win) => win.minimize(),
 } satisfies Record<WindowControlAction, (win: BrowserWindow) => void>;
 
-const WindowControlPayloadSchema = Schema.Union(
-  Schema.Literal("minimize"),
-  Schema.Literal("maximize"),
-  Schema.Literal("close")
-);
-
 const registerWindowControlHandler = (): void => {
-  registerCommandHandler("window:control", (payload) =>
-    Effect.gen(function* windowControl() {
-      const action = yield* decodeCommandPayload(
-        WindowControlPayloadSchema,
-        payload,
-        "window:control"
+  mainRuntime.runSync(
+    Effect.gen(function* registerWindowControl() {
+      const router = yield* IPCRouter;
+      yield* router.register("window:control", (payload) =>
+        Effect.gen(function* windowControl() {
+          const action: WindowControlAction = yield* decodeCommandPayload(
+            WindowControlPayloadSchema,
+            payload,
+            "window:control"
+          );
+          const win = getMainWindow();
+          if (win) {
+            WINDOW_ACTIONS[action](win);
+          }
+          return { done: action };
+        })
       );
-      const win = getMainWindow();
-      if (win) {
-        WINDOW_ACTIONS[action]?.(win);
-      }
-      return { done: action };
     })
   );
 };
@@ -88,12 +84,16 @@ const initAdBlockerLazy = (): void => {
     .runPromise(
       Effect.gen(function* loadAdBlocker() {
         const adBlocker = yield* AdBlocker;
-        return yield* adBlocker.init;
+        // Single-flight in the service — repeat calls just await readiness.
+        yield* adBlocker.init;
       })
     )
-    .catch(() =>
-      console.warn("Ad blocker failed to initialize, continuing without it")
-    );
+    .catch((error) => {
+      console.warn(
+        "Ad blocker failed to initialize, continuing without it",
+        error
+      );
+    });
 };
 
 app.on("ready", async () => {
@@ -137,15 +137,12 @@ app.on("ready", async () => {
   setupAdBlocking(katsuSession);
 
   // Send state on EVERY finished load so dev HMR/full reloads re-hydrate.
-  let adBlockInitStarted = false;
   mainWindow.webContents.on("did-finish-load", () => {
     void sendInitialState();
-    if (!adBlockInitStarted) {
-      adBlockInitStarted = true;
-      // Defer ad-blocker init until after first paint — it must not block
-      // window creation. Requests fail open until the engine is ready.
-      initAdBlockerLazy();
-    }
+    // Defer ad-blocker init until after first paint — it must not block
+    // window creation. Requests fail open until the engine is ready; the
+    // service makes repeat calls (dev reloads) single-flight no-ops.
+    initAdBlockerLazy();
   });
 
   // Intercept the close BEFORE the window is destroyed: `closed` would null

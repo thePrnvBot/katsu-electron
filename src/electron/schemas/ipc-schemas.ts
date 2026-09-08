@@ -10,6 +10,7 @@ import type {
   TerminalResizePayload,
   TerminalSpawnOptions,
   TerminalWritePayload,
+  WindowControlAction,
   WindowControlCommand,
   WindowKind,
   WindowMetadata,
@@ -20,6 +21,9 @@ import type {
  *
  * Each schema is annotated with its contract type from
  * `src/shared/contract.ts`, so drift between the two fails to compile.
+ * Command schemas are composed from the exported payload schemas — the
+ * payload definitions here are the single source of truth for both the
+ * router's envelope decode and each handler's payload decode.
  */
 
 const BoundsSchema: Schema.Schema<Bounds> = Schema.Struct({
@@ -60,30 +64,45 @@ export const SettingsSchema: Schema.Schema<Settings> = Schema.Struct({
   windowPeeking: Schema.Boolean,
 });
 
+// --- Command payloads (single source for envelope + handler decodes) ---
+
+export const WindowControlPayloadSchema: Schema.Schema<WindowControlAction> =
+  Schema.Union(
+    Schema.Literal("minimize"),
+    Schema.Literal("maximize"),
+    Schema.Literal("close")
+  );
+
+export const SettingsSavePayloadSchema: Schema.Schema<
+  SettingsSaveCommand["payload"]
+> = Schema.Struct({
+  settings: SettingsSchema,
+});
+
+export const PermissionRespondPayloadSchema: Schema.Schema<
+  PermissionRespondCommand["payload"]
+> = Schema.Struct({
+  granted: Schema.Boolean,
+  requestId: Schema.String,
+});
+
+// --- Command envelope (payload + type) ---
+
 const WindowControlCommandSchema: Schema.Schema<WindowControlCommand> =
   Schema.Struct({
-    payload: Schema.Union(
-      Schema.Literal("minimize"),
-      Schema.Literal("maximize"),
-      Schema.Literal("close")
-    ),
+    payload: WindowControlPayloadSchema,
     type: Schema.Literal("window:control"),
   });
 
 const SettingsSaveCommandSchema: Schema.Schema<SettingsSaveCommand> =
   Schema.Struct({
-    payload: Schema.Struct({
-      settings: SettingsSchema,
-    }),
+    payload: SettingsSavePayloadSchema,
     type: Schema.Literal("settings:save"),
   });
 
 const PermissionRespondCommandSchema: Schema.Schema<PermissionRespondCommand> =
   Schema.Struct({
-    payload: Schema.Struct({
-      granted: Schema.Boolean,
-      requestId: Schema.String,
-    }),
+    payload: PermissionRespondPayloadSchema,
     type: Schema.Literal("permission:respond"),
   });
 

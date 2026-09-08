@@ -24,10 +24,8 @@ import {
   TerminalWritePayloadSchema,
   WindowsSchema,
 } from "../schemas/ipc-schemas.js";
-import {
-  registerBuiltinCommandHandlers,
-  IPCRouter,
-} from "../services/ipc-router.js";
+import { FileStaging } from "../services/file-staging.js";
+import { IPCRouter } from "../services/ipc-router.js";
 import { Persistence } from "../services/persistence.js";
 import { TerminalService } from "../services/terminal.js";
 import { getDropsDir, isPathInside, sanitizeTempFileName } from "../util.js";
@@ -50,18 +48,24 @@ const assertMainWindowSender = (event: IpcMainInvokeEvent): void => {
   }
 };
 
-/**
- * One-shot read capability: paths the user picked in the native open
- * dialog. `fs:stageFile` consumes entries, so a renderer cannot stage
- * arbitrary paths it was never granted.
- */
-const stageablePaths = new Set<string>();
-
 const unauthorizedResult = { error: "unauthorized", success: false } as const;
 
-export const registerIpcHandlers = (): void => {
-  registerBuiltinCommandHandlers();
+/**
+ * Runtime-validate a payload at the IPC boundary: `A` is inferred from the
+ * schema, the annotation records the wire's declared shape, and the decode
+ * enforces it. Failures reject the `ipcMain.handle` promise.
+ */
+const decodePayload = <A>(
+  schema: Schema.Schema<A>,
+  payload: A,
+  message: string
+): Effect.Effect<A, Error> =>
+  Effect.try({
+    catch: (cause) => new Error(message, { cause }),
+    try: () => Schema.decodeUnknownSync(schema)(payload),
+  });
 
+export const registerIpcHandlers = (): void => {
   // Unified command router
   ipcMain.handle(IpcChannel.command, async (event, command: IPCCommand) => {
     try {
@@ -94,9 +98,12 @@ export const registerIpcHandlers = (): void => {
     const result = await dialog.showOpenDialog(win, {
       properties: ["openFile", "multiSelections"],
     });
-    for (const filePath of result.filePaths) {
-      stageablePaths.add(filePath);
-    }
+    await mainRuntime.runPromise(
+      Effect.gen(function* grantStaging() {
+        const staging = yield* FileStaging;
+        yield* staging.grantPaths(result.filePaths);
+      })
+    );
     return { canceled: result.canceled, filePaths: result.filePaths };
   });
 
@@ -104,7 +111,13 @@ export const registerIpcHandlers = (): void => {
   // no renderer round-trip). Returns the staged path for katsu:// URLs.
   ipcMain.handle(IpcChannel.fsStageFile, async (event, filePath: string) => {
     assertMainWindowSender(event);
-    if (!stageablePaths.delete(filePath)) {
+    const granted = await mainRuntime.runPromise(
+      Effect.gen(function* consumeGrant() {
+        const staging = yield* FileStaging;
+        return yield* staging.consumePath(filePath);
+      })
+    );
+    if (!granted) {
       throw new Error("Path was not granted by the open dialog");
     }
     const dir = getDropsDir();
@@ -156,11 +169,11 @@ export const registerIpcHandlers = (): void => {
       assertMainWindowSender(event);
       return await mainRuntime.runPromise(
         Effect.gen(function* spawnTerminal() {
-          const parsed = yield* Effect.try({
-            catch: () => new Error("invalid terminal spawn options"),
-            try: () =>
-              Schema.decodeUnknownSync(TerminalSpawnOptionsSchema)(options),
-          });
+          const parsed = yield* decodePayload(
+            TerminalSpawnOptionsSchema,
+            options,
+            "invalid terminal spawn options"
+          );
           const terminals = yield* TerminalService;
           return yield* terminals.spawn(parsed);
         })
@@ -175,11 +188,11 @@ export const registerIpcHandlers = (): void => {
       assertMainWindowSender(event);
       await mainRuntime.runPromise(
         Effect.gen(function* writeTerminal() {
-          const parsed = yield* Effect.try({
-            catch: () => new Error("invalid terminal write payload"),
-            try: () =>
-              Schema.decodeUnknownSync(TerminalWritePayloadSchema)(payload),
-          });
+          const parsed = yield* decodePayload(
+            TerminalWritePayloadSchema,
+            payload,
+            "invalid terminal write payload"
+          );
           const terminals = yield* TerminalService;
           yield* terminals.write(parsed.id, parsed.data);
         })
@@ -194,11 +207,11 @@ export const registerIpcHandlers = (): void => {
       assertMainWindowSender(event);
       await mainRuntime.runPromise(
         Effect.gen(function* resizeTerminal() {
-          const parsed = yield* Effect.try({
-            catch: () => new Error("invalid terminal resize payload"),
-            try: () =>
-              Schema.decodeUnknownSync(TerminalResizePayloadSchema)(payload),
-          });
+          const parsed = yield* decodePayload(
+            TerminalResizePayloadSchema,
+            payload,
+            "invalid terminal resize payload"
+          );
           const terminals = yield* TerminalService;
           yield* terminals.resize(parsed.id, parsed.cols, parsed.rows);
         })
@@ -211,10 +224,11 @@ export const registerIpcHandlers = (): void => {
     assertMainWindowSender(event);
     await mainRuntime.runPromise(
       Effect.gen(function* killTerminal() {
-        const parsed = yield* Effect.try({
-          catch: () => new Error("invalid terminal id"),
-          try: () => Schema.decodeUnknownSync(TerminalIdSchema)(id),
-        });
+        const parsed = yield* decodePayload(
+          TerminalIdSchema,
+          id,
+          "invalid terminal id"
+        );
         const terminals = yield* TerminalService;
         yield* terminals.kill(parsed);
       })
@@ -230,10 +244,11 @@ export const registerIpcHandlers = (): void => {
       try {
         await mainRuntime.runPromise(
           Effect.gen(function* program() {
-            const parsed = yield* Effect.try({
-              catch: () => new Error("invalid state payload"),
-              try: () => Schema.decodeUnknownSync(WindowsSchema)(windows),
-            });
+            const parsed = yield* decodePayload(
+              WindowsSchema,
+              windows,
+              "invalid state payload"
+            );
             const persistence = yield* Persistence;
             yield* persistence.saveState(parsed);
           })
