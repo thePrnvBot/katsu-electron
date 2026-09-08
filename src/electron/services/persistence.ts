@@ -8,6 +8,7 @@ import * as Schema from "effect/Schema";
 import type { Settings, WindowMetadata } from "../../shared/contract.js";
 import { DEFAULT_SETTINGS } from "../../shared/contract.js";
 import { SettingsSchema, WindowsSchema } from "../schemas/ipc-schemas.js";
+import type { PersistenceErrorReason } from "../shared/errors/persistence-error.js";
 import { PersistenceError } from "../shared/errors/persistence-error.js";
 import {
   getSettingsFilePath,
@@ -28,40 +29,44 @@ export interface Persistence {
 
 export const Persistence = Context.GenericTag<Persistence>("Persistence");
 
+const persistenceError = (
+  cause: unknown,
+  reason: PersistenceErrorReason
+): PersistenceError => new PersistenceError({ cause, reason });
+
+const writeFile = (
+  filePath: () => string,
+  content: string
+): Effect.Effect<void, PersistenceError> =>
+  writeFileAtomic(filePath(), content, {
+    rename: (cause) => persistenceError(cause, "AtomicRenameFailed"),
+    write: (cause) => persistenceError(cause, "WriteFailed"),
+  });
+
+const readFileAndDecode = <A, I>(
+  filePath: () => string,
+  schema: Schema.Schema<A, I>
+): Effect.Effect<A, PersistenceError> =>
+  Effect.gen(function* decodeFile() {
+    const content = yield* Effect.tryPromise({
+      catch: (cause) => persistenceError(cause, "ReadFailed"),
+      try: () => fs.readFile(filePath(), "utf-8"),
+    });
+    return yield* Effect.try({
+      catch: (cause) => persistenceError(cause, "ParseFailed"),
+      try: () => Schema.decodeUnknownSync(schema)(JSON.parse(content)),
+    });
+  });
+
 export const PersistenceLive = Layer.succeed(Persistence, {
-  loadSettings: Effect.gen(function* loadSettings() {
-    const content = yield* Effect.tryPromise({
-      catch: (cause) => new PersistenceError({ cause, reason: "ReadFailed" }),
-      try: () => fs.readFile(getSettingsFilePath(), "utf-8"),
-    });
-    return yield* Effect.try({
-      catch: (cause) => new PersistenceError({ cause, reason: "ParseFailed" }),
-      try: () => Schema.decodeUnknownSync(SettingsSchema)(JSON.parse(content)),
-    });
-  }).pipe(Effect.catchAll(() => Effect.succeed(DEFAULT_SETTINGS))),
-
-  loadState: Effect.gen(function* loadState() {
-    const content = yield* Effect.tryPromise({
-      catch: (cause) => new PersistenceError({ cause, reason: "ReadFailed" }),
-      try: () => fs.readFile(getStateFilePath(), "utf-8"),
-    });
-    return yield* Effect.try({
-      catch: (cause) => new PersistenceError({ cause, reason: "ParseFailed" }),
-      try: () => Schema.decodeUnknownSync(WindowsSchema)(JSON.parse(content)),
-    });
-  }).pipe(Effect.catchAll(() => Effect.succeed([]))),
-
-  saveSettings: (settings: Settings) =>
-    writeFileAtomic(getSettingsFilePath(), JSON.stringify(settings, null, 2), {
-      rename: (cause) =>
-        new PersistenceError({ cause, reason: "AtomicRenameFailed" }),
-      write: (cause) => new PersistenceError({ cause, reason: "WriteFailed" }),
-    }),
-
-  saveState: (windows: readonly WindowMetadata[]) =>
-    writeFileAtomic(getStateFilePath(), JSON.stringify(windows, null, 2), {
-      rename: (cause) =>
-        new PersistenceError({ cause, reason: "AtomicRenameFailed" }),
-      write: (cause) => new PersistenceError({ cause, reason: "WriteFailed" }),
-    }),
+  loadSettings: readFileAndDecode(getSettingsFilePath, SettingsSchema).pipe(
+    Effect.catchAll(() => Effect.succeed(DEFAULT_SETTINGS))
+  ),
+  loadState: readFileAndDecode(getStateFilePath, WindowsSchema).pipe(
+    Effect.catchAll(() => Effect.succeed([]))
+  ),
+  saveSettings: (settings) =>
+    writeFile(getSettingsFilePath, JSON.stringify(settings, null, 2)),
+  saveState: (windows) =>
+    writeFile(getStateFilePath, JSON.stringify(windows, null, 2)),
 });
