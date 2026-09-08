@@ -238,11 +238,16 @@ export const App = () => {
     if (result.canceled || result.filePaths.length === 0) {
       return;
     }
-    const staged = await Promise.all(
+    // A failed stage (missing/duplicate grant) skips only that file.
+    const staged = await Promise.allSettled(
       result.filePaths.map((p) => window.electronAPI.stageFile(p))
     );
-    for (const { name, path: stagedPath } of staged) {
-      addPreview(createFilePreviewFromPath(name, stagedPath));
+    for (const outcome of staged) {
+      if (outcome.status === "fulfilled") {
+        addPreview(
+          createFilePreviewFromPath(outcome.value.name, outcome.value.path)
+        );
+      }
     }
   };
 
