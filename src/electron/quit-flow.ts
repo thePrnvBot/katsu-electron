@@ -26,6 +26,26 @@ const SAVE_TIMEOUT_MS = 2000;
 
 export const quitInProgress = (): boolean => phase !== "idle";
 
+/**
+ * Tear down PTYs and stale drops BEFORE quitting instead of racing the
+ * process exit — failures are logged but can never block the quit.
+ */
+const runQuitCleanup = async (): Promise<void> => {
+  try {
+    await mainRuntime.runPromise(
+      Effect.gen(function* cleanup() {
+        const terminals = yield* TerminalService;
+        yield* terminals.killAll();
+        yield* cleanDropsDir();
+      })
+    );
+  } catch (error) {
+    console.error("Quit cleanup failed:", error);
+  } finally {
+    app.quit();
+  }
+};
+
 export const completeSaveAndQuit = (): void => {
   if (phase === "done") {
     return;
@@ -35,14 +55,7 @@ export const completeSaveAndQuit = (): void => {
     clearTimeout(timeout);
     timeout = null;
   }
-  void mainRuntime.runPromise(
-    Effect.gen(function* cleanup() {
-      const terminals = yield* TerminalService;
-      yield* terminals.killAll();
-      yield* cleanDropsDir();
-    })
-  );
-  app.quit();
+  void runQuitCleanup();
 };
 
 export const beginSaveAndQuit = (): void => {
