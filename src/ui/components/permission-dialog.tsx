@@ -9,8 +9,10 @@ import { usePermissionStore } from "../store/permission-store";
  * without subscribing to the store.
  */
 export const PermissionDialog = () => {
-  const request = usePermissionStore((s) => s.request);
-  const setRequest = usePermissionStore((s) => s.setRequest);
+  // Show the head of the queue; answering it reveals the next request.
+  const requests = usePermissionStore((s) => s.requests);
+  const removeRequest = usePermissionStore((s) => s.removeRequest);
+  const request = requests[0] ?? null;
   const allowRef = useRef<HTMLButtonElement>(null);
   const denyRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -18,10 +20,10 @@ export const PermissionDialog = () => {
   useEffect(() => {
     window.electronAPI.setPermissionRequestHandler(
       (permissionRequestPayload) => {
-        setRequest(permissionRequestPayload);
+        usePermissionStore.getState().pushRequest(permissionRequestPayload);
       }
     );
-  }, [setRequest]);
+  }, []);
 
   useEffect(() => {
     if (request) {
@@ -38,8 +40,11 @@ export const PermissionDialog = () => {
   }
 
   const respond = (granted: boolean) => {
+    if (!request) {
+      return;
+    }
     void window.electronAPI.respondToPermission(request.id, granted);
-    setRequest(null);
+    removeRequest(request.id);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

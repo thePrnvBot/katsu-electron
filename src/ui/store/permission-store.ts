@@ -2,12 +2,24 @@ import { create } from "zustand";
 
 import type { PermissionRequestPayload } from "../../shared/contract";
 
+/**
+ * Requests queue instead of overwriting: each one gets its own dialog
+ * turn and its own answer, even when several sites ask at once.
+ */
 interface PermissionState {
-  request: PermissionRequestPayload | null;
-  setRequest: (request: PermissionRequestPayload | null) => void;
+  requests: readonly PermissionRequestPayload[];
+  pushRequest: (request: PermissionRequestPayload) => void;
+  removeRequest: (id: string) => void;
 }
 
 export const usePermissionStore = create<PermissionState>((set) => ({
-  request: null,
-  setRequest: (request) => set({ request }),
+  pushRequest: (request) =>
+    set((s) => ({ requests: [...s.requests, request] })),
+
+  removeRequest: (id) =>
+    set((s) => ({
+      requests: s.requests.filter((request) => request.id !== id),
+    })),
+
+  requests: [],
 }));

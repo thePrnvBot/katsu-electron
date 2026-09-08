@@ -134,7 +134,7 @@ export const App = () => {
         return;
       }
       // Permission dialog is modal — arrow keys must not pan the camera behind it.
-      if (usePermissionStore.getState().request) {
+      if (usePermissionStore.getState().requests.length > 0) {
         return;
       }
       const delta = getArrowDelta(e.key);
