@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -14,6 +15,7 @@ export interface Permissions {
   /**
    * Ask the user (via the renderer permission dialog) whether to grant a
    * permission. Resolves false on timeout or when no window is available.
+   * Concurrent requests are independent — each gets its own dialog slot.
    */
   readonly requestPermission: (input: {
     readonly permission: string;
@@ -40,40 +42,26 @@ export interface Permissions {
 
 export const Permissions = Context.GenericTag<Permissions>("Permissions");
 
-const pendingRequests = new Map<
-  string,
-  { resolve: (granted: boolean) => void; timeout: NodeJS.Timeout }
->();
+export const PermissionsLive = Layer.sync(Permissions, () => {
+  /** id -> reply slot for requests the renderer has not answered yet. */
+  const pendingRequests = new Map<string, Deferred.Deferred<boolean>>();
+  const grantedPermissions = new Set<string>();
 
-const grantedPermissions = new Set<string>();
-
-export const PermissionsLive = Layer.succeed(Permissions, {
-  requestPermission: ({ permission, origin, message, securityOrigin }) =>
-    Effect.async<boolean>((resume) => {
+  const requestPermission: Permissions["requestPermission"] = ({
+    message,
+    origin,
+    permission,
+    securityOrigin,
+  }) =>
+    Effect.gen(function* ask() {
       const win = getMainWindow();
       if (!win || win.isDestroyed()) {
-        resume(Effect.succeed(false));
-        return;
+        return false;
       }
 
       const id = crypto.randomUUID();
-      const timeout = setTimeout(() => {
-        pendingRequests.delete(id);
-        resume(Effect.succeed(false));
-      }, REQUEST_TIMEOUT_MS);
-
-      pendingRequests.set(id, {
-        resolve: (granted) => {
-          if (granted) {
-            grantedPermissions.add(`${origin}:${permission}`);
-            if (securityOrigin && securityOrigin !== origin) {
-              grantedPermissions.add(`${securityOrigin}:${permission}`);
-            }
-          }
-          resume(Effect.succeed(granted));
-        },
-        timeout,
-      });
+      const reply = yield* Deferred.make<boolean>();
+      pendingRequests.set(id, reply);
 
       const payload: PermissionRequestPayload = {
         id,
@@ -82,22 +70,50 @@ export const PermissionsLive = Layer.succeed(Permissions, {
         permission,
       };
       win.webContents.send(IpcChannel.permissionRequest, payload);
-    }),
 
-  respondToRequest: (requestId: string, granted: boolean) =>
-    Effect.sync(() => {
-      const pending = pendingRequests.get(requestId);
-      if (!pending) {
+      // Dialog answer or timeout — whichever lands first. A late answer
+      // finds no map entry and is dropped.
+      const granted = yield* Deferred.await(reply).pipe(
+        Effect.timeout(REQUEST_TIMEOUT_MS),
+        Effect.catchAll(() => Effect.succeed(false))
+      );
+      pendingRequests.delete(id);
+
+      if (granted) {
+        grantedPermissions.add(`${origin}:${permission}`);
+        if (securityOrigin && securityOrigin !== origin) {
+          grantedPermissions.add(`${securityOrigin}:${permission}`);
+        }
+      }
+      return granted;
+    });
+
+  const respondToRequest: Permissions["respondToRequest"] = (
+    requestId,
+    granted
+  ) =>
+    Effect.gen(function* answer() {
+      const reply = pendingRequests.get(requestId);
+      if (!reply) {
         return;
       }
-      clearTimeout(pending.timeout);
       pendingRequests.delete(requestId);
-      pending.resolve(granted);
-    }),
+      yield* Deferred.succeed(reply, granted);
+    });
 
-  wasGranted: (origin: string, permission: string) =>
-    grantedPermissions.has(`${origin}:${permission}`),
+  const wasGranted: Permissions["wasGranted"] = (origin, permission) =>
+    grantedPermissions.has(`${origin}:${permission}`);
 
-  wasGrantedForOrigins: (origins: readonly string[], permission: string) =>
-    origins.some((origin) => grantedPermissions.has(`${origin}:${permission}`)),
+  const wasGrantedForOrigins: Permissions["wasGrantedForOrigins"] = (
+    origins,
+    permission
+  ) =>
+    origins.some((origin) => grantedPermissions.has(`${origin}:${permission}`));
+
+  return {
+    requestPermission,
+    respondToRequest,
+    wasGranted,
+    wasGrantedForOrigins,
+  };
 });
