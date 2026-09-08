@@ -1,9 +1,7 @@
 import { create } from "zustand";
 
-interface Settings {
-  readonly keepWindowsAlive: boolean;
-  readonly windowPeeking: boolean;
-}
+import { DEFAULT_SETTINGS } from "../../shared/contract";
+import type { Settings } from "../../shared/contract";
 
 interface SettingsState {
   settings: Settings;
@@ -15,7 +13,7 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>((set) => ({
   loadSettings: (settings) => set({ settings }),
 
-  settings: { keepWindowsAlive: false, windowPeeking: false },
+  settings: DEFAULT_SETTINGS,
 
   toggleKeepWindowsAlive: () =>
     set((s) => ({
