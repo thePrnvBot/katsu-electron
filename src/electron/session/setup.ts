@@ -126,45 +126,48 @@ export const setupDefaultProtocol = (): void => {
   protocol.handle("katsu", handleKatsuRequest);
 };
 
-const evaluateBlocking = async (
+/**
+ * Full blocking decision for one request: match, count, and notify the
+ * renderer — as one effect so the unit can be run/tested end to end.
+ */
+const evaluateBlocking = (
   details: Electron.OnBeforeRequestListenerDetails
-): Promise<{ cancel: boolean }> => {
-  const originURL = details.frame?.url || details.referrer || "";
+): Effect.Effect<{ cancel: boolean }, never, AdBlocker> =>
+  Effect.gen(function* blocking() {
+    const originURL = details.frame?.url || details.referrer || "";
 
-  const outcome = await mainRuntime.runPromise(
-    Effect.gen(function* blocking() {
-      const adBlocker = yield* AdBlocker;
-      const blocked = yield* adBlocker.matchRequest({
-        method: details.method,
-        originURL,
-        type: details.resourceType,
-        url: details.url,
-      });
-      const origin = blocked ? originFromUrl(originURL) : null;
-      const count = origin
-        ? yield* adBlocker.getBlockedCountForOrigin(origin)
-        : 0;
-      return { blocked, count, origin };
-    })
-  );
-
-  if (outcome.blocked && outcome.origin) {
-    getMainWindow()?.webContents.send(IpcChannel.adblockCount, {
-      count: outcome.count,
-      origin: outcome.origin,
+    const adBlocker = yield* AdBlocker;
+    const blocked = yield* adBlocker.matchRequest({
+      method: details.method,
+      originURL,
+      type: details.resourceType,
+      url: details.url,
     });
-  }
-
-  return { cancel: outcome.blocked };
-};
+    const origin = blocked ? originFromUrl(originURL) : null;
+    if (!origin) {
+      return { cancel: blocked };
+    }
+    const count = yield* adBlocker.getBlockedCountForOrigin(origin);
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send(IpcChannel.adblockCount, { count, origin });
+    }
+    return { cancel: blocked };
+  });
 
 export const setupAdBlocking = (katsuSession: Electron.Session): void => {
   katsuSession.webRequest.onBeforeRequest(
     { urls: ["<all_urls>"] },
     (details, callback) => {
-      evaluateBlocking(details)
-        .then((result) => callback(result))
-        .catch(() => callback({ cancel: false }));
+      // Fail open on defects — a broken blocker must never take the
+      // network down with it — but leave a trace of why.
+      mainRuntime
+        .runPromise(evaluateBlocking(details))
+        .then(callback)
+        .catch((error) => {
+          console.error("Ad-block check failed; allowing request", error);
+          callback({ cancel: false });
+        });
     }
   );
 };
