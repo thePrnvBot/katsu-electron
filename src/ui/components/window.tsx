@@ -109,7 +109,11 @@ const WindowBody = ({
               src={win.url}
               style={{
                 ...absoluteFill,
-                visibility: isNearCamera ? "visible" : "hidden",
+                // keepWindowsAlive keeps far webviews mounted at full quality
+                // on purpose — hiding them here instead suspends their paint
+                // while the window frame stays in the viewport (blank void).
+                visibility:
+                  keepWindowsAlive || isNearCamera ? "visible" : "hidden",
               }}
               partition="persist:katsu"
               webpreferences="contextIsolation=yes, sandbox=yes, nodeIntegration=no"
