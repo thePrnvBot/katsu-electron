@@ -7,5 +7,11 @@
   ],
   "ignoreBinaries": ["cloc"],
   "project": ["src/**/*.{ts,tsx}", "*.ts"],
-  "ignoreDependencies": ["clsx", "geist", "tailwind-merge", "tailwindcss"]
+  "ignoreDependencies": [
+    "clsx",
+    "electron-builder",
+    "geist",
+    "tailwind-merge",
+    "tailwindcss"
+  ]
 }
