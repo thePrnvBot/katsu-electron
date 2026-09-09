@@ -46,6 +46,12 @@ export const DEFAULT_SETTINGS: Settings = {
   windowPeeking: false,
 };
 
+/** Summary of a saved workspace for list UIs. */
+export interface WorkspaceSummary {
+  readonly name: string;
+  readonly windowCount: number;
+}
+
 /** Maximum size for files copied into the preview staging directory. */
 export const MAX_TEMP_FILE_BYTES = 256 * 1024 * 1024;
 

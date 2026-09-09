@@ -9,6 +9,7 @@ import type {
   TerminalSpawnOptions,
   TerminalSpawnResult,
   WindowMetadata,
+  WorkspaceSummary,
 } from "../../shared/contract";
 
 export interface ElectronAPI {
@@ -26,6 +27,14 @@ export interface ElectronAPI {
   saveSettings: (settings: Settings) => Promise<IPCResult>;
   saveStateResponse: (windows: WindowMetadata[]) => Promise<void>;
   saveTempFile: (name: string, buffer: ArrayBuffer) => Promise<string>;
+  /** Save current windows under a workspace name (overwrites same name). */
+  saveWorkspace: (name: string, windows: WindowMetadata[]) => Promise<void>;
+  /** List saved workspace summaries, sorted by name. */
+  listWorkspaces: () => Promise<WorkspaceSummary[]>;
+  /** Load a saved workspace's windows (null when the name is unknown). */
+  loadWorkspace: (name: string) => Promise<readonly WindowMetadata[] | null>;
+  /** Delete a saved workspace by name (no-op when the name is unknown). */
+  deleteWorkspace: (name: string) => Promise<void>;
   sendCommand: (command: IPCCommand) => Promise<IPCResult>;
   setBlockedCountHandler: (
     subscriberId: string,

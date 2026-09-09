@@ -105,6 +105,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
   deleteTempFile: (filePath: string) =>
     ipcRenderer.invoke(IpcChannel.fsDeleteTempFile, filePath),
 
+  deleteWorkspace: (name: string) =>
+    ipcRenderer.invoke(IpcChannel.workspaceDelete, name),
+
+  listWorkspaces: () => ipcRenderer.invoke(IpcChannel.workspaceList),
+
+  loadWorkspace: (name: string) =>
+    ipcRenderer.invoke(IpcChannel.workspaceLoad, name),
+
   openFile: () => ipcRenderer.invoke(IpcChannel.dialogOpenFile),
 
   respondToPermission: (requestId: string, granted: boolean) =>
@@ -124,6 +132,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   saveTempFile: (name: string, buffer: ArrayBuffer) =>
     ipcRenderer.invoke(IpcChannel.dialogSaveTempFile, { buffer, name }),
+
+  saveWorkspace: (name: string, windows: WindowMetadata[]) =>
+    ipcRenderer.invoke(IpcChannel.workspaceSave, { name, windows }),
 
   sendCommand: (command: IPCCommand) =>
     ipcRenderer.invoke(IpcChannel.command, command),

@@ -24,6 +24,11 @@ export const IpcChannel = {
   terminalResize: "terminal:resize",
   terminalSpawn: "terminal:spawn",
   terminalWrite: "terminal:write",
+  /** Renderer -> main: workspace persistence (save/list/load/delete). */
+  workspaceDelete: "workspace:delete",
+  workspaceList: "workspace:list",
+  workspaceLoad: "workspace:load",
+  workspaceSave: "workspace:save",
 } as const;
 
 export type IpcChannel = (typeof IpcChannel)[keyof typeof IpcChannel];

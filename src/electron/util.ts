@@ -18,6 +18,9 @@ export const getSettingsFilePath = (): string => getUserData("settings.json");
 export const getAdBlockCacheFilePath = (): string =>
   getUserData("adblock-cache.json");
 
+export const getWorkspacesFilePath = (): string =>
+  getUserData("workspaces.json");
+
 /**
  * Only directory the `katsu://` protocol is allowed to serve from.
  * Holds renderer-dropped/staged preview files.

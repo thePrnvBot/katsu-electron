@@ -59,6 +59,14 @@ const WindowMetadataSchema: Schema.Schema<WindowMetadata> = Schema.Struct({
 
 export const WindowsSchema = Schema.Array(WindowMetadataSchema);
 
+/** One saved workspace entry in `workspaces.json`. */
+const WorkspaceEntrySchema = Schema.Struct({
+  name: Schema.String,
+  windows: WindowsSchema,
+});
+
+export const WorkspacesSchema = Schema.Array(WorkspaceEntrySchema);
+
 export const SettingsSchema: Schema.Schema<Settings> = Schema.Struct({
   keepWindowsAlive: Schema.Boolean,
   windowPeeking: Schema.Boolean,
@@ -89,6 +97,11 @@ export const PermissionRespondPayloadSchema: Schema.Schema<
 export const TempFileSavePayloadSchema = Schema.Struct({
   buffer: Schema.Unknown,
   name: Schema.String,
+});
+
+export const WorkspaceSavePayloadSchema = Schema.Struct({
+  name: Schema.String.pipe(Schema.maxLength(64)),
+  windows: WindowsSchema,
 });
 
 // --- Command envelope (payload + type) ---
