@@ -1,6 +1,7 @@
 {
   "appId": "com.thePrnvBot.katsu",
   "files": ["dist-electron", "dist-react"],
+  "npmRebuild": false,
   "asarUnpack": ["**/node_modules/node-pty/**"],
   "icon": "./desktopIcon.png",
   "mac": {
@@ -9,6 +10,9 @@
   "linux": {
     "target": "AppImage",
     "category": "Utility"
+  },
+  "msi": {
+    "warningsAsErrors": false
   },
   "win": {
     "target": ["portable", "msi"]
