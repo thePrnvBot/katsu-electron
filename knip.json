@@ -5,6 +5,7 @@
     "src/electron/preload.ts",
     "src/ui/types/electron.d.ts"
   ],
+  "ignoreBinaries": ["cloc"],
   "project": ["src/**/*.{ts,tsx}", "*.ts"],
   "ignoreDependencies": ["clsx", "geist", "tailwind-merge", "tailwindcss"]
 }

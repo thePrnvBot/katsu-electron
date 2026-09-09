@@ -6,9 +6,10 @@
   "type": "module",
   "main": "dist-electron/electron/main.js",
   "scripts": {
-    "dev": "run-p dev:react dev:electron",
+    "dev": "run-p dev:react dev:electron:wait",
     "dev:react": "vite",
     "dev:electron": "pnpm transpile:electron && cross-env NODE_ENV=development electron .",
+    "dev:electron:wait": "pnpm transpile:electron && node scripts/wait-for-vite.mjs && cross-env NODE_ENV=development electron .",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "postinstall": "electron-rebuild -f -w node-pty || echo 'electron-rebuild skipped (node-pty N-API prebuild is ABI-compatible)'",

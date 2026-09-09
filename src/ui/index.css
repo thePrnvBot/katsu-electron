@@ -2,7 +2,7 @@
 
 @font-face {
   font-family: "Geist";
-  src: url("../../../node_modules/geist/dist/fonts/geist-sans/Geist-Regular.woff2")
+  src: url("../../node_modules/geist/dist/fonts/geist-sans/Geist-Regular.woff2")
     format("woff2");
 }
 
