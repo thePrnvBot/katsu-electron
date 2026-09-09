@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { useCameraStore } from "../store/camera-store";
 import { useWindowStore } from "../store/window-store";
+import { windowCenterCell } from "../utils/layout";
 
 export const useCenterOnWindow = () => {
   const setActiveWindow = useWindowStore((s) => s.setActiveWindow);
@@ -15,10 +16,8 @@ export const useCenterOnWindow = () => {
       }
 
       const { grid } = useCameraStore.getState();
-      const cx = Math.floor((w.x + w.w / 2) / grid.cellWidth);
-      const cy = Math.floor((w.y + w.h / 2) / grid.cellHeight);
-
-      moveToCell(cx, cy);
+      const cell = windowCenterCell(w, grid);
+      moveToCell(cell.x, cell.y);
       setActiveWindow(id);
     },
     [moveToCell, setActiveWindow]

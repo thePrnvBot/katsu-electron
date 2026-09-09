@@ -51,3 +51,17 @@ export const computeWindowSize = (
     w: Math.min(defaultW, contentMaxW) + WINDOW_BORDER,
   };
 };
+
+/** Grid cell containing the center of the given window bounds. */
+export const windowCenterCell = (
+  window: {
+    readonly h: number;
+    readonly w: number;
+    readonly x: number;
+    readonly y: number;
+  },
+  grid: { readonly cellHeight: number; readonly cellWidth: number }
+) => ({
+  x: Math.floor((window.x + window.w / 2) / grid.cellWidth),
+  y: Math.floor((window.y + window.h / 2) / grid.cellHeight),
+});

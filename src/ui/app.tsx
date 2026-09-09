@@ -21,6 +21,10 @@ import {
 } from "./utils/file-preview";
 import { ignoreFailure } from "./utils/ignore-failure";
 import { centerBoundsInCell, computeWindowSize } from "./utils/layout";
+import {
+  windowFromMetadata,
+  windowMetadataFromWindow,
+} from "./utils/window-metadata";
 
 const KNOWN_SCHEMES = ["file://", "katsu://", "http://", "https://"] as const;
 
@@ -76,18 +80,7 @@ export const App = () => {
   useEffect(() => {
     window.electronAPI.setStateLoadedHandler((savedWindows) => {
       for (const savedWindow of savedWindows) {
-        addWindow({
-          fileName: savedWindow.title,
-          h: savedWindow.bounds.height,
-          id: savedWindow.id,
-          kind: savedWindow.kind,
-          previewType: savedWindow.previewType,
-          url: savedWindow.url,
-          w: savedWindow.bounds.width,
-          x: savedWindow.bounds.x,
-          y: savedWindow.bounds.y,
-          z: savedWindow.zIndex,
-        });
+        addWindow(windowFromMetadata(savedWindow));
       }
     });
 
@@ -123,15 +116,7 @@ export const App = () => {
       const persistable = currentWindows.filter(
         (w) => w.previewType === undefined
       );
-      const metadata = persistable.map((w) => ({
-        bounds: { height: w.h, width: w.w, x: w.x, y: w.y },
-        id: w.id,
-        kind: w.kind,
-        previewType: w.previewType,
-        title: w.fileName,
-        url: w.url,
-        zIndex: w.z ?? 1,
-      }));
+      const metadata = persistable.map(windowMetadataFromWindow);
       void ignoreFailure(window.electronAPI.saveStateResponse(metadata));
     });
   }, []);
