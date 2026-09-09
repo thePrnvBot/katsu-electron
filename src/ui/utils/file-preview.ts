@@ -1,3 +1,4 @@
+import { MAX_TEMP_FILE_BYTES } from "../../shared/contract";
 import type { PreviewType } from "../../shared/contract";
 import {
   AUDIO_EXTENSIONS,
@@ -5,6 +6,7 @@ import {
   VIDEO_EXTENSIONS,
   TEXT_EXTENSIONS,
 } from "../lib/constants";
+import { ignoreFailure } from "./ignore-failure";
 
 const TEXT_MIME_PREFIXES = [
   "text/",
@@ -89,7 +91,7 @@ export const revokePreviewUrl = (url: string): void => {
   }
   const tempPath = tempPathFromKatsuUrl(url);
   if (tempPath) {
-    void window.electronAPI.deleteTempFile(tempPath);
+    void ignoreFailure(window.electronAPI.deleteTempFile(tempPath));
   }
 };
 
@@ -101,6 +103,10 @@ export const revokePreviewUrl = (url: string): void => {
 export const createFilePreview = async (
   file: File
 ): Promise<FilePreviewResult> => {
+  if (file.size > MAX_TEMP_FILE_BYTES) {
+    throw new Error("File exceeds maximum allowed size");
+  }
+
   const fileName = file.name;
   const mimeType = file.type || "application/octet-stream";
   const previewType = getPreviewType(mimeType, fileName);

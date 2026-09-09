@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import type { PreviewType } from "../shared/contract";
+import type { PreviewType, Settings } from "../shared/contract";
 import { CameraAnimator } from "./components/camera-animator";
 import { CommandMenu } from "./components/command-menu/command-menu";
 import { Minimap } from "./components/minimap";
@@ -19,6 +19,7 @@ import {
   createFilePreview,
   createFilePreviewFromPath,
 } from "./utils/file-preview";
+import { ignoreFailure } from "./utils/ignore-failure";
 import { centerBoundsInCell, computeWindowSize } from "./utils/layout";
 
 const KNOWN_SCHEMES = ["file://", "katsu://", "http://", "https://"] as const;
@@ -31,6 +32,28 @@ const normalizeUrl = (value: string): string | null => {
     return value;
   }
   return `https://${value}`;
+};
+
+const processSequentially = async <T,>(
+  items: readonly T[],
+  operation: (item: T) => Promise<void>,
+  index = 0
+): Promise<number> => {
+  if (index >= items.length) {
+    return 0;
+  }
+  const item = items[index];
+  if (item === undefined) {
+    return 0;
+  }
+
+  let failed = 0;
+  try {
+    await operation(item);
+  } catch {
+    failed = 1;
+  }
+  return failed + (await processSequentially(items, operation, index + 1));
 };
 
 export const App = () => {
@@ -46,6 +69,7 @@ export const App = () => {
   const setActiveWindow = useWindowStore((s) => s.setActiveWindow);
   const loadSettings = useSettingsStore((s) => s.loadSettings);
   const [urlField, setUrlField] = useState("");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const wheelAccum = useRef({ x: 0, y: 0 });
 
   // Load persisted state on mount — parsed at the boundary, no casts.
@@ -74,9 +98,17 @@ export const App = () => {
 
   // Persist settings whenever they change (e.g. windowPeeking toggle).
   useEffect(() => {
+    const persistSettings = async (settings: Settings): Promise<void> => {
+      try {
+        await window.electronAPI.saveSettings(settings);
+      } catch {
+        setStatusMessage("Settings could not be saved.");
+      }
+    };
+
     const unsub = useSettingsStore.subscribe((state, prev) => {
       if (state.settings !== prev.settings) {
-        void window.electronAPI.saveSettings(state.settings);
+        void persistSettings(state.settings);
       }
     });
     return unsub;
@@ -100,7 +132,7 @@ export const App = () => {
         url: w.url,
         zIndex: w.z ?? 1,
       }));
-      void window.electronAPI.saveStateResponse(metadata);
+      void ignoreFailure(window.electronAPI.saveStateResponse(metadata));
     });
   }, []);
 
@@ -227,27 +259,37 @@ export const App = () => {
   };
 
   const handleFileOpen = async (files: File[]) => {
-    const previews = await Promise.all(files.map(createFilePreview));
-    for (const preview of previews) {
-      addPreview(preview);
+    setStatusMessage(null);
+    const failedCount = await processSequentially(files, async (file) => {
+      addPreview(await createFilePreview(file));
+    });
+    if (failedCount > 0) {
+      setStatusMessage(`${failedCount} file(s) could not be opened.`);
     }
   };
 
   const handleOpenFileDialog = async () => {
-    const result = await window.electronAPI.openFile();
+    setStatusMessage(null);
+    let result: Awaited<ReturnType<typeof window.electronAPI.openFile>>;
+    try {
+      result = await window.electronAPI.openFile();
+    } catch {
+      setStatusMessage("The file dialog could not be opened.");
+      return;
+    }
     if (result.canceled || result.filePaths.length === 0) {
       return;
     }
     // A failed stage (missing/duplicate grant) skips only that file.
-    const staged = await Promise.allSettled(
-      result.filePaths.map((p) => window.electronAPI.stageFile(p))
-    );
-    for (const outcome of staged) {
-      if (outcome.status === "fulfilled") {
-        addPreview(
-          createFilePreviewFromPath(outcome.value.name, outcome.value.path)
-        );
+    const failedCount = await processSequentially(
+      result.filePaths,
+      async (filePath) => {
+        const staged = await window.electronAPI.stageFile(filePath);
+        addPreview(createFilePreviewFromPath(staged.name, staged.path));
       }
+    );
+    if (failedCount > 0) {
+      setStatusMessage(`${failedCount} file(s) could not be opened.`);
     }
   };
 
@@ -269,6 +311,16 @@ export const App = () => {
       </World>
       <Minimap />
       <PermissionDialog />
+      {statusMessage && (
+        <button
+          type="button"
+          className="fixed bottom-4 left-1/2 z-[100000] -translate-x-1/2 rounded-full border border-white/10 bg-[#222] px-4 py-2 text-sm text-white/80 shadow-lg"
+          onClick={() => setStatusMessage(null)}
+          aria-label="Dismiss status message"
+        >
+          {statusMessage}
+        </button>
+      )}
     </div>
   );
 };

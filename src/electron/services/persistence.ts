@@ -34,14 +34,53 @@ const persistenceError = (
   reason: PersistenceErrorReason
 ): PersistenceError => new PersistenceError({ cause, reason });
 
+const pendingWrites = new Map<string, Promise<void>>();
+
+const queueWrite = async (
+  targetPath: string,
+  content: string
+): Promise<void> => {
+  const previous = pendingWrites.get(targetPath);
+  const operation = (async () => {
+    if (previous) {
+      try {
+        await previous;
+      } catch {
+        // A failed write must not block later saves.
+      }
+    }
+    await Effect.runPromise(
+      writeFileAtomic(targetPath, content, {
+        rename: (cause) => persistenceError(cause, "AtomicRenameFailed"),
+        write: (cause) => persistenceError(cause, "WriteFailed"),
+      })
+    );
+  })();
+  pendingWrites.set(targetPath, operation);
+
+  try {
+    await operation;
+  } finally {
+    if (pendingWrites.get(targetPath) === operation) {
+      pendingWrites.delete(targetPath);
+    }
+  }
+};
+
 const writeFile = (
   filePath: () => string,
   content: string
-): Effect.Effect<void, PersistenceError> =>
-  writeFileAtomic(filePath(), content, {
-    rename: (cause) => persistenceError(cause, "AtomicRenameFailed"),
-    write: (cause) => persistenceError(cause, "WriteFailed"),
+): Effect.Effect<void, PersistenceError> => {
+  const targetPath = filePath();
+
+  return Effect.tryPromise({
+    catch: (cause) =>
+      cause instanceof PersistenceError
+        ? cause
+        : persistenceError(cause, "WriteFailed"),
+    try: () => queueWrite(targetPath, content),
   });
+};
 
 const readFileAndDecode = <A, I>(
   filePath: () => string,
