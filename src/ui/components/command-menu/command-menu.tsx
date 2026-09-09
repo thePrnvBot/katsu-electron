@@ -6,12 +6,18 @@ import { LayoutMenu } from "./layout-menu";
 import { RootMenu } from "./root-menu";
 import { SettingsMenu } from "./settings-menu";
 import { WindowsMenu } from "./windows-menu";
+import { WorkspaceMenu } from "./workspace-menu";
 
 export interface CloseProps {
   closeAndResetMenu: () => void;
 }
 
-export type CommandPages = "root" | "windows" | "layout" | "settings";
+export type CommandPages =
+  | "root"
+  | "windows"
+  | "layout"
+  | "settings"
+  | "workspace";
 
 interface CommandMenuProps {
   openTerminal: () => void;
@@ -56,6 +62,7 @@ export const CommandMenu = ({ openTerminal }: CommandMenuProps) => {
   return (
     <Command.Dialog
       open={open}
+      shouldFilter={page !== "workspace"}
       onOpenChange={(isOpen) => {
         setOpen(isOpen);
         if (!isOpen) {
@@ -113,6 +120,12 @@ export const CommandMenu = ({ openTerminal }: CommandMenuProps) => {
         )}
         {page === "settings" && (
           <SettingsMenu closeAndResetMenu={closeAndResetMenu} />
+        )}
+        {page === "workspace" && (
+          <WorkspaceMenu
+            closeAndResetMenu={closeAndResetMenu}
+            search={search}
+          />
         )}
       </Command.List>
     </Command.Dialog>

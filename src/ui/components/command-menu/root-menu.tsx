@@ -50,6 +50,12 @@ export const RootMenu = ({
         Settings
       </Command.Item>
       <Command.Item
+        onSelect={() => navigateToPage("workspace")}
+        className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
+      >
+        Workspaces
+      </Command.Item>
+      <Command.Item
         onSelect={() => handleOpenTerminal()}
         className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
       >

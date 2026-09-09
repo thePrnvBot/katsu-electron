@@ -37,6 +37,8 @@ interface WindowState {
   updateWindow: (id: string, patch: Partial<Window>) => void;
   removeWindow: (id: string) => void;
   closeAllWindows: () => void;
+  /** Swap the whole window set (workspace load); releases preview URLs. */
+  replaceWindows: (windows: Window[]) => void;
   setActiveWindow: (id: string | null) => void;
   bringToFront: (id: string) => void;
   maximizeWindow: (id: string) => void;
@@ -132,6 +134,16 @@ export const useWindowStore = create<WindowState>((set) => ({
       return {
         activeWindowId: s.activeWindowId === id ? null : s.activeWindowId,
         windows: s.windows.filter((window) => window.id !== id),
+      };
+    }),
+  replaceWindows: (windows) =>
+    set((s) => {
+      for (const w of s.windows) {
+        revokePreviewUrl(w.url);
+      }
+      return {
+        activeWindowId: null,
+        windows,
       };
     }),
   setActiveWindow: (id) => set({ activeWindowId: id }),
