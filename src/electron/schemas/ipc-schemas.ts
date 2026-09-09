@@ -86,6 +86,11 @@ export const PermissionRespondPayloadSchema: Schema.Schema<
   requestId: Schema.String,
 });
 
+export const TempFileSavePayloadSchema = Schema.Struct({
+  buffer: Schema.Unknown,
+  name: Schema.String,
+});
+
 // --- Command envelope (payload + type) ---
 
 const WindowControlCommandSchema: Schema.Schema<WindowControlCommand> =

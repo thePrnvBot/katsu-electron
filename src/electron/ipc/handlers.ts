@@ -14,6 +14,7 @@ import type {
   TerminalWritePayload,
   WindowMetadata,
 } from "../../shared/contract.js";
+import { MAX_TEMP_FILE_BYTES } from "../../shared/contract.js";
 import { IpcChannel } from "../../shared/ipc-channels.js";
 import { completeSaveAndQuit } from "../quit-flow.js";
 import { mainRuntime } from "../runtime.js";
@@ -22,6 +23,7 @@ import {
   TerminalResizePayloadSchema,
   TerminalSpawnOptionsSchema,
   TerminalWritePayloadSchema,
+  TempFileSavePayloadSchema,
   WindowsSchema,
 } from "../schemas/ipc-schemas.js";
 import { FileStaging } from "../services/file-staging.js";
@@ -30,12 +32,6 @@ import { Persistence } from "../services/persistence.js";
 import { TerminalService } from "../services/terminal.js";
 import { getDropsDir, isPathInside, sanitizeTempFileName } from "../util.js";
 import { getMainWindow } from "../window-manager.js";
-
-/**
- * Dropped files are uploaded over IPC — cap what we accept.
- * 1 GiB limit to bound memory usage during upload.
- */
-const MAX_TEMP_FILE_BYTES = 1024 * 1024 * 1024;
 
 /**
  * Every privileged handler proves the caller is the app's own main-window
@@ -111,10 +107,13 @@ export const registerIpcHandlers = (): void => {
   // no renderer round-trip). Returns the staged path for katsu:// URLs.
   ipcMain.handle(IpcChannel.fsStageFile, async (event, filePath: string) => {
     assertMainWindowSender(event);
+    const parsedFilePath = await mainRuntime.runPromise(
+      decodePayload(Schema.String, filePath, "invalid staged file path")
+    );
     const granted = await mainRuntime.runPromise(
       Effect.gen(function* consumeGrant() {
         const staging = yield* FileStaging;
-        return yield* staging.consumePath(filePath);
+        return yield* staging.consumePath(parsedFilePath);
       })
     );
     if (!granted) {
@@ -122,12 +121,16 @@ export const registerIpcHandlers = (): void => {
     }
     const dir = getDropsDir();
     await fs.mkdir(dir, { recursive: true });
+    const sourceStat = await fs.stat(parsedFilePath);
+    if (sourceStat.size > MAX_TEMP_FILE_BYTES) {
+      throw new Error("File exceeds maximum allowed size");
+    }
     const stagedPath = path.join(
       dir,
-      `${crypto.randomUUID()}-${sanitizeTempFileName(path.basename(filePath))}`
+      `${crypto.randomUUID()}-${sanitizeTempFileName(path.basename(parsedFilePath))}`
     );
-    await fs.copyFile(filePath, stagedPath);
-    return { name: path.basename(filePath), path: stagedPath };
+    await fs.copyFile(parsedFilePath, stagedPath);
+    return { name: path.basename(parsedFilePath), path: stagedPath };
   });
 
   // FS: delete a temp preview file (must live inside the drops dir)
@@ -135,7 +138,10 @@ export const registerIpcHandlers = (): void => {
     IpcChannel.fsDeleteTempFile,
     async (event, filePath: string) => {
       assertMainWindowSender(event);
-      const resolved = path.resolve(filePath);
+      const parsedFilePath = await mainRuntime.runPromise(
+        decodePayload(Schema.String, filePath, "invalid temp file path")
+      );
+      const resolved = path.resolve(parsedFilePath);
       if (!isPathInside(getDropsDir(), resolved)) {
         return;
       }
@@ -148,16 +154,26 @@ export const registerIpcHandlers = (): void => {
     IpcChannel.dialogSaveTempFile,
     async (event, args: { name: string; buffer: ArrayBuffer }) => {
       assertMainWindowSender(event);
-      if (args.buffer.byteLength > MAX_TEMP_FILE_BYTES) {
+      const parsed = await mainRuntime.runPromise(
+        decodePayload(
+          TempFileSavePayloadSchema,
+          args,
+          "invalid temp file payload"
+        )
+      );
+      if (!(parsed.buffer instanceof ArrayBuffer)) {
+        throw new Error("Invalid temp file buffer");
+      }
+      if (parsed.buffer.byteLength > MAX_TEMP_FILE_BYTES) {
         throw new Error("File exceeds maximum allowed size");
       }
       const dir = getDropsDir();
       await fs.mkdir(dir, { recursive: true });
       const filePath = path.join(
         dir,
-        `${crypto.randomUUID()}-${sanitizeTempFileName(args.name)}`
+        `${crypto.randomUUID()}-${sanitizeTempFileName(parsed.name)}`
       );
-      await fs.writeFile(filePath, Buffer.from(args.buffer));
+      await fs.writeFile(filePath, Buffer.from(parsed.buffer));
       return filePath;
     }
   );

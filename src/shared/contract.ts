@@ -46,6 +46,9 @@ export const DEFAULT_SETTINGS: Settings = {
   windowPeeking: false,
 };
 
+/** Maximum size for files copied into the preview staging directory. */
+export const MAX_TEMP_FILE_BYTES = 256 * 1024 * 1024;
+
 export interface PermissionRequestPayload {
   readonly id: string;
   readonly permission: string;

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -64,7 +65,7 @@ export const writeFileAtomic = <E>(
   }
 ): Effect.Effect<void, E> =>
   Effect.gen(function* writeFileAtomicGen() {
-    const tmpPath = `${filePath}.tmp`;
+    const tmpPath = `${filePath}.${crypto.randomUUID()}.tmp`;
     yield* Effect.tryPromise({
       catch: errorFactory.write,
       try: () => fs.writeFile(tmpPath, content, "utf-8"),

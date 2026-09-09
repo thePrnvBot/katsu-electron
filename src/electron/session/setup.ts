@@ -173,18 +173,28 @@ export const setupAdBlocking = (katsuSession: Electron.Session): void => {
 };
 
 const isAllowedMainWindowUrl = (url: string): boolean => {
-  if (isDev()) {
-    return url.startsWith(DEV_ORIGIN);
+  try {
+    const parsed = new URL(url);
+    if (isDev()) {
+      return parsed.origin === DEV_ORIGIN;
+    }
+    return parsed.protocol === "file:" && parsed.host === "";
+  } catch {
+    return false;
   }
-  return url.startsWith("file:");
 };
 
 export const setupWebContentsListeners = (): void => {
   app.on("web-contents-created", (_event, contents) => {
     // No new native windows from any guest — open real links externally.
     contents.setWindowOpenHandler(({ url }) => {
-      if (url.startsWith("https://") || url.startsWith("http://")) {
-        void shell.openExternal(url);
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+          void shell.openExternal(url);
+        }
+      } catch {
+        // Invalid URLs stay blocked.
       }
       return { action: "deny" };
     });

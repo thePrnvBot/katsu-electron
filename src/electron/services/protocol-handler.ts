@@ -22,7 +22,11 @@ export const ProtocolHandler =
 const getMimeType = (filePath: string): string => {
   const ext = path.extname(filePath).toLowerCase();
   const mimeTypes = new Map([
+    [".aac", "audio/aac"],
+    [".avi", "video/x-msvideo"],
+    [".bmp", "image/bmp"],
     [".css", "text/css"],
+    [".flac", "audio/flac"],
     [".gif", "image/gif"],
     [".go", "text/x-go"],
     [".html", "text/html"],
@@ -35,6 +39,10 @@ const getMimeType = (filePath: string): string => {
     [".md", "text/markdown"],
     [".mp3", "audio/mpeg"],
     [".mp4", "video/mp4"],
+    [".m4a", "audio/mp4"],
+    [".mkv", "video/x-matroska"],
+    [".mov", "video/quicktime"],
+    [".ogg", "audio/ogg"],
     [".pdf", "application/pdf"],
     [".png", "image/png"],
     [".py", "text/x-python"],
@@ -44,7 +52,9 @@ const getMimeType = (filePath: string): string => {
     [".tsx", "text/typescript"],
     [".txt", "text/plain"],
     [".wav", "audio/wav"],
+    [".webp", "image/webp"],
     [".webm", "video/webm"],
+    [".ico", "image/x-icon"],
   ]);
   return mimeTypes.get(ext) ?? "application/octet-stream";
 };
@@ -70,8 +80,33 @@ const validateFilePath = (
       });
     }
 
-    const resolved = path.resolve(filePath);
-    if (!isPathInside(getDropsDir(), resolved)) {
+    const lexicalResolved = path.resolve(filePath);
+    if (!isPathInside(getDropsDir(), lexicalResolved)) {
+      return yield* new ProtocolError({
+        path: filePath,
+        reason: "PermissionDenied",
+      });
+    }
+
+    const resolved = yield* Effect.tryPromise({
+      catch: (cause) =>
+        new ProtocolError({
+          cause,
+          path: lexicalResolved,
+          reason: "FileNotFound",
+        }),
+      try: () => fs.realpath(lexicalResolved),
+    });
+    const realDropsDir = yield* Effect.tryPromise({
+      catch: (cause) =>
+        new ProtocolError({
+          cause,
+          path: getDropsDir(),
+          reason: "FileNotFound",
+        }),
+      try: () => fs.realpath(getDropsDir()),
+    });
+    if (!isPathInside(realDropsDir, resolved)) {
       return yield* new ProtocolError({
         path: filePath,
         reason: "PermissionDenied",
@@ -163,7 +198,10 @@ export const ProtocolHandlerLive = Layer.succeed(ProtocolHandler, {
         catch: () => new ProtocolError({ reason: "InvalidPath" }),
         try: () => new URL(request.url),
       });
-      const filePath = decodeURIComponent(url.pathname.slice(1));
+      const filePath = yield* Effect.try({
+        catch: () => new ProtocolError({ reason: "InvalidPath" }),
+        try: () => decodeURIComponent(url.pathname.slice(1)),
+      });
       const { resolved, size } = yield* validateFilePath(filePath);
       const mimeType = getMimeType(resolved);
 

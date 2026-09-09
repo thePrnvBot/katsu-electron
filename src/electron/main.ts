@@ -21,6 +21,11 @@ import {
 import { cleanDropsDir, isDev } from "./util.js";
 import { getMainWindow, setMainWindow } from "./window-manager.js";
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
 // katsu:// is our own scheme: mark it standard/secure/stream-capable BEFORE
 // the app is ready so the protocol handler can stream preview media.
 protocol.registerSchemesAsPrivileged([
@@ -38,6 +43,19 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.userAgentFallback = cleanUserAgent;
+
+if (hasSingleInstanceLock) {
+  app.on("second-instance", () => {
+    const win = getMainWindow();
+    if (!win || win.isDestroyed()) {
+      return;
+    }
+    if (win.isMinimized()) {
+      win.restore();
+    }
+    win.focus();
+  });
+}
 
 // NOTE: `disable-renderer-backgrounding` / `disable-background-timer-throttling`
 // / `disable-backgrounding-occluded-windows` are deliberately NOT set — on
@@ -57,7 +75,9 @@ if (process.platform === "win32") {
   );
 }
 
-setupWebContentsListeners();
+if (hasSingleInstanceLock) {
+  setupWebContentsListeners();
+}
 
 const WINDOW_ACTIONS = {
   close: (win) => win.close(),
@@ -111,6 +131,10 @@ const initAdBlockerLazy = (): void => {
 };
 
 app.on("ready", async () => {
+  if (!hasSingleInstanceLock) {
+    return;
+  }
+
   // Wipe preview drops orphaned by a previous run before anything can serve them.
   await mainRuntime.runPromise(cleanDropsDir());
 
@@ -139,13 +163,14 @@ app.on("ready", async () => {
 
   setMainWindow(mainWindow);
 
-  if (isDev()) {
-    mainWindow.loadURL("http://localhost:5123");
-  } else {
-    mainWindow.loadFile(
-      path.join(app.getAppPath(), "dist-react", "index.html")
-    );
-  }
+  const loadPromise = isDev()
+    ? mainWindow.loadURL("http://localhost:5123")
+    : mainWindow.loadFile(
+        path.join(app.getAppPath(), "dist-react", "index.html")
+      );
+  void loadPromise.catch(() => {
+    console.error("Failed to load renderer");
+  });
 
   const katsuSession = setupKatsuSession();
   setupAdBlocking(katsuSession);
@@ -189,6 +214,9 @@ app.on("ready", async () => {
 });
 
 app.on("before-quit", (event) => {
+  if (!hasSingleInstanceLock) {
+    return;
+  }
   if (quitInProgress()) {
     return;
   }
