@@ -26,16 +26,42 @@ const terminalDataSubscribers = new Map<
   string,
   (data: TerminalDataPayload) => void
 >();
+const terminalDataBacklog = new Map<
+  string,
+  { bytes: number; events: TerminalDataPayload[] }
+>();
+const MAX_BUFFERED_TERMINAL_EVENTS = 256;
+const MAX_BUFFERED_TERMINAL_BYTES = 256 * 1024;
 ipcRenderer.on(IpcChannel.terminalData, (_event, data: TerminalDataPayload) => {
-  terminalDataSubscribers.get(data.id)?.(data);
+  const handler = terminalDataSubscribers.get(data.id);
+  if (handler) {
+    handler(data);
+    return;
+  }
+
+  const backlog = terminalDataBacklog.get(data.id) ?? { bytes: 0, events: [] };
+  if (
+    backlog.events.length < MAX_BUFFERED_TERMINAL_EVENTS &&
+    backlog.bytes + data.data.length <= MAX_BUFFERED_TERMINAL_BYTES
+  ) {
+    backlog.events.push(data);
+    backlog.bytes += data.data.length;
+    terminalDataBacklog.set(data.id, backlog);
+  }
 });
 
 const terminalExitSubscribers = new Map<
   string,
   (data: TerminalExitPayload) => void
 >();
+const terminalExitBacklog = new Map<string, TerminalExitPayload>();
 ipcRenderer.on(IpcChannel.terminalExit, (_event, data: TerminalExitPayload) => {
-  terminalExitSubscribers.get(data.id)?.(data);
+  const handler = terminalExitSubscribers.get(data.id);
+  if (handler) {
+    handler(data);
+    return;
+  }
+  terminalExitBacklog.set(data.id, data);
 });
 
 let permissionRequestHandler:
@@ -71,6 +97,11 @@ ipcRenderer.on(IpcChannel.settingsLoaded, (_event, settings) => {
 });
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  clearTerminalEventBuffer: (id: string) => {
+    terminalDataBacklog.delete(id);
+    terminalExitBacklog.delete(id);
+  },
+
   deleteTempFile: (filePath: string) =>
     ipcRenderer.invoke(IpcChannel.fsDeleteTempFile, filePath),
 
@@ -138,8 +169,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
     handler: (data: TerminalDataPayload) => void
   ): (() => void) => {
     terminalDataSubscribers.set(id, handler);
+    const backlog = terminalDataBacklog.get(id);
+    if (backlog) {
+      terminalDataBacklog.delete(id);
+      for (const data of backlog.events) {
+        handler(data);
+      }
+    }
     return () => {
-      terminalDataSubscribers.delete(id);
+      if (terminalDataSubscribers.get(id) === handler) {
+        terminalDataSubscribers.delete(id);
+      }
     };
   },
 
@@ -148,8 +188,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
     handler: (data: TerminalExitPayload) => void
   ): (() => void) => {
     terminalExitSubscribers.set(id, handler);
+    const backlog = terminalExitBacklog.get(id);
+    if (backlog) {
+      terminalExitBacklog.delete(id);
+      handler(backlog);
+    }
     return () => {
-      terminalExitSubscribers.delete(id);
+      if (terminalExitSubscribers.get(id) === handler) {
+        terminalExitSubscribers.delete(id);
+      }
     };
   },
 

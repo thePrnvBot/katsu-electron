@@ -5,6 +5,8 @@ import { useEffect, useRef } from "react";
 
 import "@xterm/xterm/css/xterm.css";
 
+import { ignoreFailure } from "../utils/ignore-failure";
+
 const TERMINAL_THEME = {
   background: "#0f0f0f",
   cursor: "#ddd",
@@ -99,7 +101,8 @@ export const TerminalView = ({ windowId, cwd }: TerminalViewProps) => {
         });
         if (disposed) {
           // Component unmounted while the spawn was in flight.
-          void window.electronAPI.terminalKill(id);
+          window.electronAPI.clearTerminalEventBuffer(id);
+          void ignoreFailure(window.electronAPI.terminalKill(id));
           return;
         }
         terminalId = id;
@@ -117,17 +120,15 @@ export const TerminalView = ({ windowId, cwd }: TerminalViewProps) => {
 
     const dataDisposable = term.onData((data) => {
       if (terminalId) {
-        void window.electronAPI.terminalWrite(terminalId, data);
+        void ignoreFailure(window.electronAPI.terminalWrite(terminalId, data));
       }
     });
 
     const resizeObserver = new ResizeObserver(() => {
       fitAddon.fit();
       if (terminalId) {
-        void window.electronAPI.terminalResize(
-          terminalId,
-          term.cols,
-          term.rows
+        void ignoreFailure(
+          window.electronAPI.terminalResize(terminalId, term.cols, term.rows)
         );
       }
     });
@@ -140,7 +141,8 @@ export const TerminalView = ({ windowId, cwd }: TerminalViewProps) => {
       unsubData?.();
       unsubExit?.();
       if (terminalId) {
-        void window.electronAPI.terminalKill(terminalId);
+        window.electronAPI.clearTerminalEventBuffer(terminalId);
+        void ignoreFailure(window.electronAPI.terminalKill(terminalId));
       }
       term.dispose();
     };

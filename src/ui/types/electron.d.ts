@@ -59,6 +59,7 @@ export interface ElectronAPI {
     id: string,
     handler: (data: TerminalExitPayload) => void
   ) => () => void;
+  clearTerminalEventBuffer: (id: string) => void;
 }
 
 declare global {
