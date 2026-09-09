@@ -27,7 +27,9 @@ export const PermissionDialog = () => {
 
   useEffect(() => {
     if (request) {
-      dialogRef.current?.showModal();
+      if (!dialogRef.current?.open) {
+        dialogRef.current?.showModal();
+      }
       // Auto-focus the deny button (safe default).
       denyRef.current?.focus();
     } else {
@@ -39,19 +41,23 @@ export const PermissionDialog = () => {
     return null;
   }
 
-  const respond = (granted: boolean) => {
+  const respond = async (granted: boolean): Promise<void> => {
     if (!request) {
       return;
     }
-    void window.electronAPI.respondToPermission(request.id, granted);
     removeRequest(request.id);
+    try {
+      await window.electronAPI.respondToPermission(request.id, granted);
+    } catch {
+      // The main process may already be quitting.
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
-      respond(false);
+      void respond(false);
       return;
     }
     // Minimal focus trap: Tab cycles between the two buttons.
@@ -93,7 +99,9 @@ export const PermissionDialog = () => {
           <button
             ref={denyRef}
             type="button"
-            onClick={() => respond(false)}
+            onClick={() => {
+              void respond(false);
+            }}
             className="rounded-full bg-[#444] px-4 py-1.5 text-sm text-white/70 transition hover:bg-[#555]"
           >
             Deny
@@ -101,7 +109,9 @@ export const PermissionDialog = () => {
           <button
             ref={allowRef}
             type="button"
-            onClick={() => respond(true)}
+            onClick={() => {
+              void respond(true);
+            }}
             className="rounded-full bg-[#444] px-4 py-1.5 text-sm text-white/70 transition hover:bg-[#555]"
           >
             Allow
