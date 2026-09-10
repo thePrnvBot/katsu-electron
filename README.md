@@ -10,8 +10,9 @@ A desktop web browser built with Electron, React, and TypeScript featuring a uni
 - **Window Layouts** — Snap windows to predefined layouts (half, quarter, centered) within the current grid cell
 - **Custom Protocol** — `katsu://` protocol for internal navigation and file previews
 - **Window Persistence** — Save and restore your window layout across sessions
+- **Workspaces** — Save the current window setup under a name and reload it from the command menu
 - **Command Menu** — Quick access to actions via keyboard shortcut
-- **Permission Handling** — Intercept and approve/deny web permission requests (geolocation, camera, microphone, etc.)
+- **Permission Handling** — Camera and microphone requests are gated behind an in-app approval dialog; all other web permissions are denied by default
 - **Cross-Platform** — Runs on macOS, Windows, and Linux
 
 ## Tech Stack
@@ -83,6 +84,9 @@ pnpm check
 # Auto-fix lint/format issues
 pnpm fix
 
+# Run tests
+pnpm test
+
 # Check for unused code
 pnpm knip
 ```
@@ -95,74 +99,35 @@ katsu-electron/
 │   ├── electron/           # Main process code
 │   │   ├── main.ts         # Electron app entry point
 │   │   ├── preload.ts      # Context bridge for IPC
-│   │   ├── webview-preload.ts  # Preload for webview tags
 │   │   ├── window-manager.ts   # Main window lifecycle
+│   │   ├── runtime.ts      # Managed Effect runtime
+│   │   ├── quit-flow.ts    # Save-and-quit coordination
 │   │   ├── util.ts         # Shared utilities
-│   │   ├── ipc/            # IPC handler definitions
-│   │   │   └── handlers.ts
+│   │   ├── ipc/            # IPC handler registration by domain
 │   │   ├── layers/         # Effect dependency layers
-│   │   │   └── main-layer.ts
-│   │   ├── schemas/        # Effect schema definitions
-│   │   │   └── ipc-schemas.ts
+│   │   ├── schemas/        # Effect schema definitions and boundary decode
 │   │   ├── services/       # Backend services
-│   │   │   ├── ad-blocker.ts
-│   │   │   ├── ipc-router.ts
-│   │   │   ├── permissions.ts
-│   │   │   ├── persistence.ts
-│   │   │   └── protocol-handler.ts
 │   │   ├── session/        # Session setup and listeners
-│   │   │   └── setup.ts
-│   │   ├── shared/         # Shared types and errors
-│   │   │   ├── types.ts
-│   │   │   └── errors/
+│   │   ├── shared/         # Shared errors
 │   │   ├── types/          # Additional type declarations
-│   │   │   └── ubo-core.d.ts
 │   │   └── filters/        # uBlock filter lists
 │   └── ui/                 # Renderer process (React)
 │       ├── app.tsx         # Main app component
 │       ├── main.tsx        # React entry point
 │       ├── index.css       # Global styles
-│       ├── components/     # React components
-│       │   ├── world.tsx       # Spatial canvas and camera
-│       │   ├── window.tsx      # Browser window wrapper
-│       │   ├── minimap.tsx     # Navigation minimap
-│       │   ├── camera-animator.tsx
-│       │   ├── command-menu.tsx
-│       │   ├── search-bar.tsx
-│       │   ├── title-bar.tsx
-│       │   ├── file-preview.tsx
-│       │   ├── permission-dialog.tsx
-│       │   ├── error-overlay.tsx
-│       │   └── preview/        # File preview components
-│       │       ├── image-preview.tsx
-│       │       ├── video-preview.tsx
-│       │       ├── audio-preview.tsx
-│       │       ├── text-preview.tsx
-│       │       └── download-preview.tsx
+│       ├── components/     # React components (command-menu/, preview/, ...)
 │       ├── store/          # Zustand state management
-│       │   ├── window-store.ts
-│       │   ├── camera-store.ts
-│       │   └── settings-store.ts
 │       ├── hooks/          # Custom React hooks
-│       │   ├── use-auto-hide.ts
-│       │   ├── use-center-window.ts
-│       │   └── use-webview-events.ts
-│       ├── lib/            # Shared utilities
-│       │   ├── constants.ts
-│       │   └── utils.ts
+│       ├── lib/            # Shared constants
 │       ├── utils/          # Domain utilities
-│       │   ├── file-preview.ts
-│       │   ├── layout.ts
-│       │   └── window-layouts.ts
-│       ├── types/          # Renderer type declarations
-│       │   └── electron.d.ts
-│       └── assets/         # Static assets
+│       └── types/          # Renderer type declarations
 ├── dist-electron/          # Compiled Electron code
 ├── dist-react/             # Built React frontend
 ├── electron-builder.json   # Build configuration
 ├── vite.config.ts          # Vite configuration
+├── vitest.config.ts        # Test runner configuration
 ├── oxfmt.config.ts         # Formatter configuration
-├── oxlint.config.ts      # Linter configuration
+├── oxlint.config.ts        # Linter configuration
 ├── knip.json               # Unused code detector config
 └── package.json
 ```
@@ -175,17 +140,16 @@ The Electron main process uses [Effect](https://effect.website/) for structured 
 
 ### IPC Communication
 
-The renderer communicates with the main process through a typed IPC router with schema-validated commands:
+The renderer communicates with the main process through typed IPC. The unified `katsu:command` envelope is schema-validated and supports:
 
 ```typescript
-// Supported command types:
-// - "dialog:openFile"     — Open native file dialog
-// - "state:load"          — Load persisted window state
-// - "state:save"          — Save current window state
-// - "settings:save"       — Save user settings
+// Router commands:
 // - "window:control"      — minimize / maximize / close
+// - "settings:save"       — Save user settings
 // - "permission:respond"  — Grant or deny a permission request
 ```
+
+Dedicated invoke channels cover native dialogs, file staging, PTY terminals, workspace persistence, and the save-state-before-quit handshake.
 
 ### Ad Blocking
 
