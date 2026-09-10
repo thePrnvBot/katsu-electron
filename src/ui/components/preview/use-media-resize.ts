@@ -10,7 +10,7 @@ export const useMediaResize = (windowId: string) => {
   return useCallback(
     (nativeWidth: number, nativeHeight: number) => {
       const { windows } = useWindowStore.getState();
-      const current = windows.find((w) => w.id === windowId);
+      const current = windows[windowId];
       if (!current || current.maximized) {
         return;
       }

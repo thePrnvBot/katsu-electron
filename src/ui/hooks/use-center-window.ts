@@ -10,7 +10,7 @@ export const useCenterOnWindow = () => {
 
   return useCallback(
     (id: string) => {
-      const w = useWindowStore.getState().windows.find((x) => x.id === id);
+      const w = useWindowStore.getState().windows[id];
       if (!w) {
         return;
       }

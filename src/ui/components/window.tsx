@@ -144,7 +144,7 @@ const WindowBody = ({
 
 // eslint-disable-next-line prefer-arrow-callback -- named function for React devtools
 export const Window = memo(function Window({ windowId }: { windowId: string }) {
-  const win = useWindowStore((s) => s.windows.find((w) => w.id === windowId));
+  const win = useWindowStore((s) => s.windows[windowId]);
   const updateWindow = useWindowStore((s) => s.updateWindow);
   const windowPeeking = useSettingsStore((s) => s.settings.windowPeeking);
   // Boolean selector: focus changes re-render only the two affected windows.
@@ -169,7 +169,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
   }, [winUrl]);
 
   const isNearCamera = useCameraStore((s) => {
-    const w = useWindowStore.getState().windows.find((x) => x.id === windowId);
+    const w = useWindowStore.getState().windows[windowId];
     if (!w || !isWebUrl(w.url)) {
       return true;
     }
@@ -209,6 +209,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
       e.preventDefault();
       e.stopPropagation();
       updateWindow(win.id, {
+        maximized: false,
         x: win.x + delta[0] * WINDOW_KEYBOARD_NUDGE_PX,
         y: win.y + delta[1] * WINDOW_KEYBOARD_NUDGE_PX,
       });
@@ -219,6 +220,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
       e.stopPropagation();
       updateWindow(win.id, {
         h: Math.max(120, win.h + delta[1] * WINDOW_KEYBOARD_NUDGE_PX),
+        maximized: false,
         w: Math.max(200, win.w + delta[0] * WINDOW_KEYBOARD_NUDGE_PX),
       });
     }
@@ -239,7 +241,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
         bringToFront(win.id);
       }}
       onDragStop={(_, d) => {
-        updateWindow(win.id, { x: d.x, y: d.y });
+        updateWindow(win.id, { maximized: false, x: d.x, y: d.y });
       }}
       onResizeStart={() => {
         setActiveWindow(win.id);
@@ -248,6 +250,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
       onResizeStop={(_, __, ref, ___, pos) => {
         updateWindow(win.id, {
           h: Math.trunc(Number(ref.style.height)),
+          maximized: false,
           w: Math.trunc(Number(ref.style.width)),
           x: pos.x,
           y: pos.y,

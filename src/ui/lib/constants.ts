@@ -11,6 +11,10 @@ export const DEFAULT_WINDOW_HEIGHT = 400;
 export const DEFAULT_WINDOW_X = 100;
 export const DEFAULT_WINDOW_Y = 100;
 
+/** Preferred preview/terminal content size before fitting to the cell. */
+export const DEFAULT_CONTENT_WIDTH = 700;
+export const DEFAULT_CONTENT_HEIGHT = 500;
+
 /** Camera/world behaviour. */
 export const WHEEL_CELL_THRESHOLD = 80;
 export const PEEK_SCALE = 0.9;

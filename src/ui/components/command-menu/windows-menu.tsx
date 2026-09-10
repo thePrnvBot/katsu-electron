@@ -1,11 +1,12 @@
 import { Command } from "cmdk";
+import { useShallow } from "zustand/react/shallow";
 
 import { useCenterOnWindow } from "../../hooks/use-center-window";
 import { useWindowStore } from "../../store/window-store";
 import type { CloseProps } from "./command-menu";
 
 export const WindowsMenu = ({ closeAndResetMenu }: CloseProps) => {
-  const windows = useWindowStore((s) => s.windows);
+  const windows = useWindowStore(useShallow((s) => Object.values(s.windows)));
   const setActiveWindow = useWindowStore((s) => s.setActiveWindow);
   const centerOnWindow = useCenterOnWindow();
 

@@ -20,9 +20,8 @@ export const saveCurrentWorkspace = async (
     return "Type a name for the workspace first.";
   }
   // Preview windows reference temp files wiped between runs — exclude them.
-  const metadata = useWindowStore
-    .getState()
-    .windows.filter((w) => w.previewType === undefined)
+  const metadata = Object.values(useWindowStore.getState().windows)
+    .filter((w) => w.previewType === undefined)
     .map(windowMetadataFromWindow);
   try {
     await window.electronAPI.saveWorkspace(trimmed, metadata);

@@ -1,4 +1,9 @@
-import { WINDOW_BORDER, WINDOW_TITLEBAR_HEIGHT } from "../lib/constants";
+import {
+  DEFAULT_CONTENT_HEIGHT,
+  DEFAULT_CONTENT_WIDTH,
+  WINDOW_BORDER,
+  WINDOW_TITLEBAR_HEIGHT,
+} from "../lib/constants";
 
 export interface Size {
   readonly h: number;
@@ -44,8 +49,8 @@ export const computeWindowSize = (
     };
   }
 
-  const defaultW = 700;
-  const defaultH = 500;
+  const defaultW = DEFAULT_CONTENT_WIDTH;
+  const defaultH = DEFAULT_CONTENT_HEIGHT;
   return {
     h: Math.min(defaultH, contentMaxH) + WINDOW_BORDER + WINDOW_TITLEBAR_HEIGHT,
     w: Math.min(defaultW, contentMaxW) + WINDOW_BORDER,

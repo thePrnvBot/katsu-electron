@@ -65,9 +65,7 @@ export const App = () => {
   const currentCell = useCameraStore((s) => s.currentCell);
   const grid = useCameraStore((s) => s.grid);
   // Selector returns a new array only when the set of ids changes.
-  const windowIds = useWindowStore(
-    useShallow((s) => s.windows.map((w) => w.id))
-  );
+  const windowIds = useWindowStore(useShallow((s) => Object.keys(s.windows)));
   const addWindow = useWindowStore((s) => s.addWindow);
   const bringToFront = useWindowStore((s) => s.bringToFront);
   const setActiveWindow = useWindowStore((s) => s.setActiveWindow);
@@ -110,7 +108,7 @@ export const App = () => {
   // Save state when main process requests it (before quit).
   useEffect(() => {
     window.electronAPI.setRequestSaveHandler(() => {
-      const currentWindows = useWindowStore.getState().windows;
+      const currentWindows = Object.values(useWindowStore.getState().windows);
       // Preview windows reference blob:/katsu:// temp files that are wiped
       // on relaunch — persisting them would only restore dead windows.
       const persistable = currentWindows.filter(

@@ -29,7 +29,8 @@ export interface Window {
 }
 
 interface WindowState {
-  windows: Window[];
+  /** Keyed by window id so per-window selectors stay O(1). */
+  windows: Record<string, Window>;
   activeWindowId: string | null;
 
   addWindow: (w: Window) => void;
@@ -44,136 +45,142 @@ interface WindowState {
   setWindowLayout: (id: string, layout: WindowLayout) => void;
 }
 
+const replaceOne = (
+  windows: Record<string, Window>,
+  id: string,
+  next: Window
+) => ({ ...windows, [id]: next });
+
 export const useWindowStore = create<WindowState>((set) => ({
   activeWindowId: null,
   addWindow: (w) =>
     set((s) => ({
-      windows: [...s.windows, w],
+      windows: { ...s.windows, [w.id]: w },
     })),
   bringToFront: (id) =>
     set((s) => {
-      const maxZ = Math.max(...s.windows.map((w) => w.z ?? 0), 0);
+      const target = s.windows[id];
+      if (!target) {
+        return s;
+      }
+      const maxZ = Math.max(
+        ...Object.values(s.windows).map((w) => w.z ?? 0),
+        0
+      );
       return {
-        windows: s.windows.map((w) =>
-          w.id === id ? { ...w, z: maxZ + 1 } : w
-        ),
+        windows: replaceOne(s.windows, id, { ...target, z: maxZ + 1 }),
       };
     }),
   closeAllWindows: () =>
     set((s) => {
-      for (const w of s.windows) {
+      for (const w of Object.values(s.windows)) {
         revokePreviewUrl(w.url);
       }
       return {
         activeWindowId: null,
-        windows: [],
+        windows: {},
       };
     }),
   maximizeWindow: (id) =>
     set((s) => {
-      const currentWindow = s.windows.find((window) => window.id === id);
-      if (!currentWindow) {
+      const target = s.windows[id];
+      if (!target) {
         return s;
       }
 
-      if (currentWindow.maximized) {
-        const pb = currentWindow.prevBounds ?? {
+      if (target.maximized) {
+        const pb = target.prevBounds ?? {
           height: DEFAULT_WINDOW_HEIGHT,
           width: DEFAULT_WINDOW_WIDTH,
           x: DEFAULT_WINDOW_X,
           y: DEFAULT_WINDOW_Y,
         };
         return {
-          windows: s.windows.map((window) =>
-            window.id === id
-              ? {
-                  ...window,
-                  h: pb.height,
-                  maximized: false,
-                  prevBounds: undefined,
-                  w: pb.width,
-                  x: pb.x,
-                  y: pb.y,
-                }
-              : window
-          ),
+          windows: replaceOne(s.windows, id, {
+            ...target,
+            h: pb.height,
+            maximized: false,
+            prevBounds: undefined,
+            w: pb.width,
+            x: pb.x,
+            y: pb.y,
+          }),
         };
       }
 
-      const { camera, grid } = useCameraStore.getState();
-      const cx = camera.x;
-      const cy = camera.y;
+      // Anchor to the settled cell, not the animated camera position.
+      const { currentCell, grid } = useCameraStore.getState();
       return {
-        windows: s.windows.map((window) =>
-          window.id === id
-            ? {
-                ...window,
-                // The window height includes its own titlebar — fill the
-                // cell entirely so maximized windows have no bottom gap.
-                h: grid.cellHeight,
-                maximized: true,
-                prevBounds: {
-                  height: window.h,
-                  width: window.w,
-                  x: window.x,
-                  y: window.y,
-                },
-                w: grid.cellWidth,
-                x: cx,
-                y: cy,
-              }
-            : window
-        ),
+        windows: replaceOne(s.windows, id, {
+          ...target,
+          // The window height includes its own titlebar — fill the cell
+          // entirely so maximized windows have no bottom gap.
+          h: grid.cellHeight,
+          maximized: true,
+          prevBounds: {
+            height: target.h,
+            width: target.w,
+            x: target.x,
+            y: target.y,
+          },
+          w: grid.cellWidth,
+          x: currentCell.x * grid.cellWidth,
+          y: currentCell.y * grid.cellHeight,
+        }),
       };
     }),
   removeWindow: (id) =>
     set((s) => {
-      const currentWindow = s.windows.find((window) => window.id === id);
-      if (currentWindow) {
-        revokePreviewUrl(currentWindow.url);
+      const target = s.windows[id];
+      if (target) {
+        revokePreviewUrl(target.url);
       }
       return {
         activeWindowId: s.activeWindowId === id ? null : s.activeWindowId,
-        windows: s.windows.filter((window) => window.id !== id),
+        windows: Object.fromEntries(
+          Object.entries(s.windows).filter(([key]) => key !== id)
+        ),
       };
     }),
   replaceWindows: (windows) =>
     set((s) => {
-      for (const w of s.windows) {
+      for (const w of Object.values(s.windows)) {
         revokePreviewUrl(w.url);
       }
       return {
         activeWindowId: null,
-        windows,
+        windows: Object.fromEntries(windows.map((w) => [w.id, w])),
       };
     }),
   setActiveWindow: (id) => set({ activeWindowId: id }),
-  setWindowLayout: (id, layout) => {
-    const { grid, currentCell } = useCameraStore.getState();
-    const bounds = resolveLayout(layout, grid);
-    const cx = currentCell.x * grid.cellWidth;
-    const cy = currentCell.y * grid.cellHeight;
-
-    set((s) => ({
-      windows: s.windows.map((window) =>
-        window.id === id
-          ? {
-              ...window,
-              h: bounds.height,
-              maximized: false,
-              w: bounds.width,
-              x: cx + bounds.x,
-              y: cy + bounds.y,
-            }
-          : window
-      ),
-    }));
-  },
+  setWindowLayout: (id, layout) =>
+    set((s) => {
+      const target = s.windows[id];
+      if (!target) {
+        return s;
+      }
+      const { grid, currentCell } = useCameraStore.getState();
+      const bounds = resolveLayout(layout, grid);
+      return {
+        windows: replaceOne(s.windows, id, {
+          ...target,
+          h: bounds.height,
+          maximized: false,
+          w: bounds.width,
+          x: currentCell.x * grid.cellWidth + bounds.x,
+          y: currentCell.y * grid.cellHeight + bounds.y,
+        }),
+      };
+    }),
   updateWindow: (id, patch) =>
-    set((s) => ({
-      windows: s.windows.map((window) =>
-        window.id === id ? { ...window, ...patch } : window
-      ),
-    })),
-  windows: [],
+    set((s) => {
+      const target = s.windows[id];
+      if (!target) {
+        return s;
+      }
+      return {
+        windows: replaceOne(s.windows, id, { ...target, ...patch }),
+      };
+    }),
+  windows: {},
 }));
