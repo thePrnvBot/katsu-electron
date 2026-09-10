@@ -9,6 +9,7 @@ import * as Layer from "effect/Layer";
 
 import { ProtocolError } from "../shared/errors/protocol-error.js";
 import { getDropsDir, isPathInside } from "../util.js";
+import { parseRangeHeader } from "./byte-range.js";
 
 export interface ProtocolHandler {
   readonly handleRequest: (
@@ -19,44 +20,45 @@ export interface ProtocolHandler {
 export const ProtocolHandler =
   Context.GenericTag<ProtocolHandler>("ProtocolHandler");
 
+const MIME_TYPES = new Map([
+  [".aac", "audio/aac"],
+  [".avi", "video/x-msvideo"],
+  [".bmp", "image/bmp"],
+  [".css", "text/css"],
+  [".flac", "audio/flac"],
+  [".gif", "image/gif"],
+  [".go", "text/x-go"],
+  [".html", "text/html"],
+  [".ico", "image/x-icon"],
+  [".jpeg", "image/jpeg"],
+  [".jpg", "image/jpeg"],
+  [".js", "text/javascript"],
+  [".json", "application/json"],
+  [".jsx", "text/javascript"],
+  [".katsu-html", "text/html"],
+  [".m4a", "audio/mp4"],
+  [".md", "text/markdown"],
+  [".mkv", "video/x-matroska"],
+  [".mov", "video/quicktime"],
+  [".mp3", "audio/mpeg"],
+  [".mp4", "video/mp4"],
+  [".ogg", "audio/ogg"],
+  [".pdf", "application/pdf"],
+  [".png", "image/png"],
+  [".py", "text/x-python"],
+  [".rs", "text/x-rust"],
+  [".svg", "image/svg+xml"],
+  [".ts", "text/typescript"],
+  [".tsx", "text/typescript"],
+  [".txt", "text/plain"],
+  [".wav", "audio/wav"],
+  [".webm", "video/webm"],
+  [".webp", "image/webp"],
+]);
+
 const getMimeType = (filePath: string): string => {
   const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes = new Map([
-    [".aac", "audio/aac"],
-    [".avi", "video/x-msvideo"],
-    [".bmp", "image/bmp"],
-    [".css", "text/css"],
-    [".flac", "audio/flac"],
-    [".gif", "image/gif"],
-    [".go", "text/x-go"],
-    [".html", "text/html"],
-    [".jpeg", "image/jpeg"],
-    [".jpg", "image/jpeg"],
-    [".js", "text/javascript"],
-    [".json", "application/json"],
-    [".jsx", "text/javascript"],
-    [".katsu-html", "text/html"],
-    [".md", "text/markdown"],
-    [".mp3", "audio/mpeg"],
-    [".mp4", "video/mp4"],
-    [".m4a", "audio/mp4"],
-    [".mkv", "video/x-matroska"],
-    [".mov", "video/quicktime"],
-    [".ogg", "audio/ogg"],
-    [".pdf", "application/pdf"],
-    [".png", "image/png"],
-    [".py", "text/x-python"],
-    [".rs", "text/x-rust"],
-    [".svg", "image/svg+xml"],
-    [".ts", "text/typescript"],
-    [".tsx", "text/typescript"],
-    [".txt", "text/plain"],
-    [".wav", "audio/wav"],
-    [".webp", "image/webp"],
-    [".webm", "video/webm"],
-    [".ico", "image/x-icon"],
-  ]);
-  return mimeTypes.get(ext) ?? "application/octet-stream";
+  return MIME_TYPES.get(ext) ?? "application/octet-stream";
 };
 
 interface ValidatedFile {
@@ -128,40 +130,6 @@ const validateFilePath = (
 
     return { resolved, size: stat.size };
   });
-
-interface ByteRange {
-  readonly start: number;
-  readonly end: number;
-}
-
-/** Parses a single `bytes=` range; returns null when unsatisfiable. */
-const parseRangeHeader = (header: string, size: number): ByteRange | null => {
-  const match = /^bytes=(?<start>\d*)-(?<end>\d*)$/u.exec(header.trim());
-  if (!match?.groups) {
-    return null;
-  }
-  const rawStart = match.groups.start;
-  const rawEnd = match.groups.end;
-  if (!rawStart && !rawEnd) {
-    return null;
-  }
-  if (!rawStart) {
-    const suffixLength = Number(rawEnd);
-    if (!Number.isInteger(suffixLength) || suffixLength <= 0) {
-      return null;
-    }
-    return { end: size - 1, start: Math.max(0, size - suffixLength) };
-  }
-  const start = Number(rawStart);
-  if (!Number.isInteger(start) || start < 0 || start >= size) {
-    return null;
-  }
-  const end = rawEnd ? Math.min(Number(rawEnd), size - 1) : size - 1;
-  if (!Number.isInteger(end) || end < start) {
-    return null;
-  }
-  return { end, start };
-};
 
 /**
  * Node's `Readable.toWeb` types don't line up with the DOM `ReadableStream`

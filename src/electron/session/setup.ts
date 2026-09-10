@@ -126,6 +126,62 @@ export const setupDefaultProtocol = (): void => {
   protocol.handle("katsu", handleKatsuRequest);
 };
 
+const ADBLOCK_NOTIFY_THROTTLE_MS = 200;
+
+const lastAdblockNotifyAt = new Map<string, number>();
+const queuedAdblockNotifies = new Map<
+  string,
+  { count: number; origin: string }
+>();
+let adblockFlushTimer: NodeJS.Timeout | null = null;
+
+/** Send the latest count to the main window — a no-op once it is gone. */
+const sendAdblockCount = (payload: { count: number; origin: string }): void => {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IpcChannel.adblockCount, payload);
+  }
+};
+
+const flushAdblockNotifies = (): void => {
+  adblockFlushTimer = null;
+  const sentAt = Date.now();
+  for (const payload of queuedAdblockNotifies.values()) {
+    sendAdblockCount(payload);
+    lastAdblockNotifyAt.set(payload.origin, sentAt);
+  }
+  queuedAdblockNotifies.clear();
+};
+
+/**
+ * Trailing-edge throttle per origin: ad-heavy pages emit hundreds of block
+ * events per second, and each message costs the renderer a render.
+ */
+const notifyAdblockCount = (payload: {
+  count: number;
+  origin: string;
+}): void => {
+  const now = Date.now();
+  const last = lastAdblockNotifyAt.get(payload.origin) ?? 0;
+  if (now - last >= ADBLOCK_NOTIFY_THROTTLE_MS) {
+    queuedAdblockNotifies.delete(payload.origin);
+    lastAdblockNotifyAt.set(payload.origin, now);
+    sendAdblockCount(payload);
+    return;
+  }
+  queuedAdblockNotifies.set(payload.origin, payload);
+  adblockFlushTimer ??= setTimeout(
+    flushAdblockNotifies,
+    ADBLOCK_NOTIFY_THROTTLE_MS
+  );
+};
+
+/** Drop throttling state for an origin (called on navigation). */
+const resetAdblockNotify = (origin: string): void => {
+  lastAdblockNotifyAt.delete(origin);
+  queuedAdblockNotifies.delete(origin);
+};
+
 /**
  * Full blocking decision for one request: match, count, and notify the
  * renderer — as one effect so the unit can be run/tested end to end.
@@ -148,10 +204,7 @@ const evaluateBlocking = (
       return { cancel: blocked };
     }
     const count = yield* adBlocker.getBlockedCountForOrigin(origin);
-    const win = getMainWindow();
-    if (win && !win.isDestroyed()) {
-      win.webContents.send(IpcChannel.adblockCount, { count, origin });
-    }
+    notifyAdblockCount({ count, origin });
     return { cancel: blocked };
   });
 
@@ -228,10 +281,8 @@ export const setupWebContentsListeners = (): void => {
           return yield* adBlocker.resetBlockedCountForOrigin(origin);
         })
       );
-      getMainWindow()?.webContents.send(IpcChannel.adblockCount, {
-        count: 0,
-        origin,
-      });
+      resetAdblockNotify(origin);
+      sendAdblockCount({ count: 0, origin });
     });
   });
 };
