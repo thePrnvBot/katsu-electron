@@ -7,5 +7,6 @@
     "outDir": "../../dist-electron",
     "skipLibCheck": true,
     "typeRoots": ["./types"]
-  }
+  },
+  "exclude": ["**/*.test.ts"]
 }

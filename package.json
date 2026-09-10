@@ -21,6 +21,7 @@
     "check": "ultracite check",
     "fix": "ultracite fix",
     "knip": "knip",
+    "test": "vitest run",
     "cloc": "cloc --exclude-ext txt ./src"
   },
   "dependencies": {
@@ -58,6 +59,7 @@
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.2",
     "ultracite": "7.9.3",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vitest": "^5.0.0"
   }
 }

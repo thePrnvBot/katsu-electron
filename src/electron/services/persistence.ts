@@ -20,12 +20,8 @@ import {
   getWorkspacesFilePath,
   writeFileAtomic,
 } from "../util.js";
-
-/** One named window setup stored in `workspaces.json`. */
-export interface WorkspaceEntry {
-  readonly name: string;
-  readonly windows: readonly WindowMetadata[];
-}
+import type { WorkspaceEntry } from "./workspace-entries.js";
+import { removeWorkspace, upsertWorkspace } from "./workspace-entries.js";
 
 export interface Persistence {
   readonly loadState: Effect.Effect<readonly WindowMetadata[]>;
@@ -148,10 +144,7 @@ export const PersistenceLive = Layer.succeed(Persistence, {
       try: () =>
         queueWriteOperation(getWorkspacesFilePath(), async () => {
           const existing = await readWorkspaces();
-          const remaining: WorkspaceEntry[] = [...existing].filter(
-            (entry) => entry.name !== name
-          );
-          return JSON.stringify(remaining, null, 2);
+          return JSON.stringify(removeWorkspace(existing, name), null, 2);
         }),
     }),
   loadSettings: readFileAndDecode(getSettingsFilePath, SettingsSchema).pipe(
@@ -174,11 +167,11 @@ export const PersistenceLive = Layer.succeed(Persistence, {
       try: () =>
         queueWriteOperation(getWorkspacesFilePath(), async () => {
           const existing = await readWorkspaces();
-          const remaining: WorkspaceEntry[] = [...existing].filter(
-            (entry) => entry.name !== name
+          return JSON.stringify(
+            upsertWorkspace(existing, name, windows),
+            null,
+            2
           );
-          remaining.push({ name, windows });
-          return JSON.stringify(remaining, null, 2);
         }),
     }),
 });
