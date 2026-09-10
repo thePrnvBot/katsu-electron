@@ -25,6 +25,9 @@ export const World = ({ children, onFileDrop }: WorldProps) => {
 
   const worldW = grid.cols * grid.cellWidth;
   const worldH = grid.rows * grid.cellHeight;
+  // Grid lines extend one cell past the world edge in every direction.
+  const gridW = worldW + 2 * grid.cellWidth;
+  const gridH = worldH + 2 * grid.cellHeight;
 
   // Direct DOM transform writes — bypasses React on every animation frame.
   useEffect(() => {
@@ -68,7 +71,18 @@ export const World = ({ children, onFileDrop }: WorldProps) => {
         ref={worldRef}
         className="absolute left-0"
         style={{
-          backgroundImage: `
+          height: worldH,
+          top: 0,
+          transformOrigin: "0 0",
+          width: worldW,
+          willChange: "transform",
+        }}
+      >
+        <div
+          aria-hidden
+          className="absolute"
+          style={{
+            backgroundImage: `
             repeating-linear-gradient(
               to right,
               rgba(255,255,255,0.06) 0px,
@@ -84,13 +98,12 @@ export const World = ({ children, onFileDrop }: WorldProps) => {
               transparent ${grid.cellHeight}px
             )
           `,
-          height: worldH,
-          top: 0,
-          transformOrigin: "0 0",
-          width: worldW,
-          willChange: "transform",
-        }}
-      >
+            height: gridH,
+            left: -grid.cellWidth,
+            top: -grid.cellHeight,
+            width: gridW,
+          }}
+        />
         <div className="relative" style={{ zIndex: 1 }}>
           {children}
         </div>
