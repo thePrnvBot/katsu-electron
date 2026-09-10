@@ -4,6 +4,7 @@ import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 import type { PermissionRequestPayload } from "../../shared/contract.js";
 import { IpcChannel } from "../../shared/ipc-channels.js";
@@ -73,12 +74,22 @@ export const PermissionsLive = Layer.sync(Permissions, () => {
 
       // Dialog answer or timeout — whichever lands first. A late answer
       // finds no map entry and is dropped.
-      const granted = yield* Deferred.await(reply).pipe(
-        Effect.timeout(REQUEST_TIMEOUT_MS),
-        Effect.catchAll(() => Effect.succeed(false))
+      const answered = yield* Deferred.await(reply).pipe(
+        Effect.timeoutOption(REQUEST_TIMEOUT_MS)
       );
       pendingRequests.delete(id);
 
+      if (Option.isNone(answered)) {
+        // The dialog is still on screen in the renderer — dismiss it so a
+        // late "Allow" click cannot look like it worked.
+        const currentWin = getMainWindow();
+        if (currentWin && !currentWin.isDestroyed()) {
+          currentWin.webContents.send(IpcChannel.permissionCancelled, id);
+        }
+        return false;
+      }
+
+      const granted = answered.value;
       if (granted) {
         grantedPermissions.add(`${origin}:${permission}`);
         if (securityOrigin && securityOrigin !== origin) {

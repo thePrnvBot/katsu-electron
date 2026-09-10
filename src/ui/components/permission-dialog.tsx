@@ -4,9 +4,8 @@ import { Z_PERMISSION_DIALOG } from "../lib/constants";
 import { usePermissionStore } from "../store/permission-store";
 
 /**
- * Modal permission dialog with focus trap, Escape-to-deny, and
- * `data-permission-dialog` so the global keydown handler can detect it
- * without subscribing to the store.
+ * Modal permission dialog with focus trap and Escape-to-deny. The app's
+ * global keydown handler suppresses camera shortcuts while requests queue.
  */
 export const PermissionDialog = () => {
   // Show the head of the queue; answering it reveals the next request.
@@ -23,6 +22,9 @@ export const PermissionDialog = () => {
         usePermissionStore.getState().pushRequest(permissionRequestPayload);
       }
     );
+    window.electronAPI.setPermissionCancelledHandler((requestId) => {
+      usePermissionStore.getState().removeRequest(requestId);
+    });
   }, []);
 
   useEffect(() => {

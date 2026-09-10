@@ -11,6 +11,8 @@ export const IpcChannel = {
   dialogSaveTempFile: "dialog:saveTempFile",
   fsDeleteTempFile: "fs:deleteTempFile",
   fsStageFile: "fs:stageFile",
+  /** Main -> renderer push: a pending permission request was cancelled. */
+  permissionCancelled: "permission:cancelled",
   permissionRequest: "permission:request",
   settingsLoaded: "settings:loaded",
   stateLoaded: "state:loaded",

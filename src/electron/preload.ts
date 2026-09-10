@@ -71,6 +71,11 @@ ipcRenderer.on(IpcChannel.permissionRequest, (_event, request) => {
   permissionRequestHandler?.(request);
 });
 
+let permissionCancelledHandler: ((requestId: string) => void) | null = null;
+ipcRenderer.on(IpcChannel.permissionCancelled, (_event, requestId: string) => {
+  permissionCancelledHandler?.(requestId);
+});
+
 let requestSaveHandler: (() => void) | null = null;
 ipcRenderer.on(IpcChannel.stateRequestSave, () => {
   requestSaveHandler?.();
@@ -147,6 +152,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => {
       blockedCountSubscribers.delete(subscriberId);
     };
+  },
+
+  setPermissionCancelledHandler: (handler: (requestId: string) => void) => {
+    permissionCancelledHandler = handler;
   },
 
   setPermissionRequestHandler: (

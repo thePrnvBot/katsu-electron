@@ -40,6 +40,7 @@ export interface ElectronAPI {
     subscriberId: string,
     handler: (data: BlockedCountPayload) => void
   ) => () => void;
+  setPermissionCancelledHandler: (handler: (requestId: string) => void) => void;
   setPermissionRequestHandler: (
     handler: (request: PermissionRequestPayload) => void
   ) => void;
