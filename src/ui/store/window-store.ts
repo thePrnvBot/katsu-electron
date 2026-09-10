@@ -6,7 +6,6 @@ import {
   DEFAULT_WINDOW_WIDTH,
   DEFAULT_WINDOW_X,
   DEFAULT_WINDOW_Y,
-  WINDOW_TITLEBAR_HEIGHT,
 } from "../lib/constants";
 import { revokePreviewUrl } from "../utils/file-preview";
 import type { WindowLayout } from "../utils/window-layouts";
@@ -109,7 +108,9 @@ export const useWindowStore = create<WindowState>((set) => ({
           window.id === id
             ? {
                 ...window,
-                h: grid.cellHeight - WINDOW_TITLEBAR_HEIGHT,
+                // The window height includes its own titlebar — fill the
+                // cell entirely so maximized windows have no bottom gap.
+                h: grid.cellHeight,
                 maximized: true,
                 prevBounds: {
                   height: window.h,

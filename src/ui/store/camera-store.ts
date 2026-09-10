@@ -2,6 +2,18 @@ import { create } from "zustand";
 
 import { APP_TITLEBAR_HEIGHT, GRID_COLS, GRID_ROWS } from "../lib/constants";
 
+/**
+ * Usable viewport size: when the borderless window covers the whole monitor
+ * it extends under the taskbar, so clamp to the OS work area (screen minus
+ * taskbar) to keep window content above it. A normal window is smaller than
+ * the work area, so `Math.min` leaves it untouched.
+ */
+const usableWidth = (): number =>
+  Math.min(window.innerWidth, window.screen.availWidth);
+
+const usableHeight = (): number =>
+  Math.min(window.innerHeight, window.screen.availHeight);
+
 interface Grid {
   readonly cols: number;
   readonly rows: number;
@@ -27,8 +39,9 @@ export const useCameraStore = create<CameraState>((set, get) => ({
   cameraTarget: { x: 0, y: 0 },
   currentCell: { x: 0, y: 0 },
   grid: {
-    cellHeight: (globalThis.window?.innerHeight ?? 900) - APP_TITLEBAR_HEIGHT,
-    cellWidth: globalThis.window?.innerWidth ?? 1400,
+    cellHeight:
+      (globalThis.window ? usableHeight() : 900) - APP_TITLEBAR_HEIGHT,
+    cellWidth: globalThis.window ? usableWidth() : 1400,
     cols: GRID_COLS,
     rows: GRID_ROWS,
   },
@@ -52,8 +65,8 @@ export const useCameraStore = create<CameraState>((set, get) => ({
   },
   refreshGridSize: () =>
     set((s) => {
-      const cellWidth = window.innerWidth;
-      const cellHeight = window.innerHeight;
+      const cellWidth = usableWidth();
+      const cellHeight = usableHeight() - APP_TITLEBAR_HEIGHT;
       const cx = s.currentCell.x * cellWidth;
       const cy = s.currentCell.y * cellHeight;
       return {
