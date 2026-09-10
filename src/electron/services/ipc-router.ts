@@ -1,9 +1,10 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
+import type * as Schema from "effect/Schema";
 
 import type { IPCCommand } from "../../shared/contract.js";
+import { decodeAtBoundary } from "../schemas/decode.js";
 import {
   IPCCommandSchema,
   PermissionRespondPayloadSchema,
@@ -39,11 +40,12 @@ export const decodeCommandPayload = <A>(
   value: DecodableCommandInput,
   command: string
 ): Effect.Effect<A, IPCError> =>
-  Effect.try({
-    catch: (cause) =>
-      new IPCError({ cause, command, reason: "SchemaValidationFailed" }),
-    try: () => Schema.decodeUnknownSync(schema)(value),
-  });
+  decodeAtBoundary(schema, value).pipe(
+    Effect.mapError(
+      (cause) =>
+        new IPCError({ cause, command, reason: "SchemaValidationFailed" })
+    )
+  );
 
 const settingsSaveHandler: CommandHandler = (payload) =>
   Effect.gen(function* settingsSave() {

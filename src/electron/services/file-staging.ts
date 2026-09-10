@@ -10,6 +10,8 @@ import * as Layer from "effect/Layer";
 export interface FileStaging {
   /** Grant (or re-grant) dialog-picked paths. */
   readonly grantPaths: (paths: readonly string[]) => Effect.Effect<void>;
+  /** Check a grant without consuming it. */
+  readonly hasPath: (filePath: string) => Effect.Effect<boolean>;
   /** Consume a grant — true only when this path was granted and unused. */
   readonly consumePath: (filePath: string) => Effect.Effect<boolean>;
 }
@@ -28,5 +30,7 @@ export const FileStagingLive = Layer.sync(FileStaging, () => {
           stageable.add(filePath);
         }
       }),
+
+    hasPath: (filePath) => Effect.sync(() => stageable.has(filePath)),
   };
 });
