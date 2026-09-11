@@ -58,6 +58,10 @@ const CachedSelfieSchema = Schema.Struct({
 /** Bound per-origin blocked-count memory growth for long sessions. */
 const MAX_TRACKED_ORIGINS = 500;
 
+/** Bound the URL -> decision cache; repeated requests (same site, many
+ * frames) then skip the filtering engine entirely. */
+const MAX_CACHED_MATCHES = 4096;
+
 const getFiltersDir = (): string =>
   path.join(app.getAppPath(), "dist-electron", "filters");
 
@@ -79,23 +83,40 @@ interface FilterEngine {
   useLists: (lists: { name: string; raw: string }[]) => Promise<void>;
 }
 
+interface AdBlockRequest {
+  readonly method: string;
+  readonly originURL: string;
+  readonly type: string;
+  readonly url: string;
+}
+
+interface AdBlockDecision {
+  readonly cancel: boolean;
+  /** Set only when the request was blocked for a known origin. */
+  readonly notify: { readonly count: number; readonly origin: string } | null;
+}
+
+const NOT_BLOCKED: AdBlockDecision = { cancel: false, notify: null };
+
+/** Hot-path decider installed by the layer once the engine is ready. */
+let decider: ((request: AdBlockRequest) => AdBlockDecision) | null = null;
+
+/**
+ * Synchronous ad-block decision for the `webRequest` hot path. Routing every
+ * request through the Effect runtime cost tens of seconds across a page load,
+ * so the layer installs a plain closure here after init. Fails open before
+ * the engine is ready.
+ */
+export const decideAdBlockRequest = (
+  request: AdBlockRequest
+): AdBlockDecision => decider?.(request) ?? NOT_BLOCKED;
+
 export interface AdBlocker {
   /**
    * Load the filter engine (bundled lists + selfie cache). Single-flight:
    * every caller awaits the same load, and a failed load stays failed.
    */
   readonly init: Effect.Effect<void, AdBlockerError>;
-  /**
-   * Fail-open until `init` completes — a request must never be held hostage
-   * by (or break because of) the blocker.
-   */
-  readonly matchRequest: (details: {
-    url: string;
-    originURL: string;
-    type: string;
-    method: string;
-  }) => Effect.Effect<boolean>;
-  readonly getBlockedCountForOrigin: (origin: string) => Effect.Effect<number>;
   readonly resetBlockedCountForOrigin: (origin: string) => Effect.Effect<void>;
 }
 
@@ -176,6 +197,7 @@ export const AdBlockerLive = Layer.effect(
   Effect.gen(function* makeAdBlocker() {
     const perOriginCounts = new Map<string, number>();
     let engine: FilterEngine | null = null;
+    const matchCache = new Map<string, boolean>();
 
     // Single-flight init: the first caller runs the load, everyone else
     // awaits the same Deferred (success or failure).
@@ -193,6 +215,51 @@ export const AdBlockerLive = Layer.effect(
         }
       }
       perOriginCounts.set(origin, (perOriginCounts.get(origin) ?? 0) + 1);
+    };
+
+    /** Cached engine match — the cache key covers everything the engine sees. */
+    const matchCached = (request: AdBlockRequest): boolean => {
+      const key = `${request.method}\u0000${request.type}\u0000${request.originURL}\u0000${request.url}`;
+      const cached = matchCache.get(key);
+      if (cached !== undefined) {
+        return cached;
+      }
+      const currentEngine = engine;
+      if (!currentEngine) {
+        return false;
+      }
+      const blocked =
+        currentEngine.matchRequest({
+          method: request.method,
+          originURL: request.originURL,
+          type: TYPE_MAP.get(request.type) ?? request.type,
+          url: request.url,
+        }) !== 0;
+      if (matchCache.size >= MAX_CACHED_MATCHES) {
+        const oldest = matchCache.keys().next().value;
+        if (oldest !== undefined) {
+          matchCache.delete(oldest);
+        }
+      }
+      matchCache.set(key, blocked);
+      return blocked;
+    };
+
+    const decide = (request: AdBlockRequest): AdBlockDecision => {
+      if (!matchCached(request)) {
+        return NOT_BLOCKED;
+      }
+      // originURL is "" for main-frame loads — keep the block decision even
+      // when the origin cannot be parsed for counting.
+      const origin = originFromUrl(request.originURL);
+      if (!origin) {
+        return { cancel: true, notify: null };
+      }
+      incrementBlockedCount(origin);
+      return {
+        cancel: true,
+        notify: { count: perOriginCounts.get(origin) ?? 0, origin },
+      };
     };
 
     const loadEngine = (
@@ -221,6 +288,8 @@ export const AdBlockerLive = Layer.effect(
         });
 
         engine = snfe;
+        // Install the synchronous hot path now that the engine is usable.
+        decider = decide;
       });
 
     const init: Effect.Effect<void, AdBlockerError> = Effect.suspend(() => {
@@ -247,35 +316,8 @@ export const AdBlockerLive = Layer.effect(
       });
     });
 
-    const matchRequest: AdBlocker["matchRequest"] = (details) =>
-      Effect.sync(() => {
-        if (!engine) {
-          return false;
-        }
-        const mappedType = TYPE_MAP.get(details.type) ?? details.type;
-        const blocked =
-          engine.matchRequest({
-            method: details.method,
-            originURL: details.originURL,
-            type: mappedType,
-            url: details.url,
-          }) !== 0;
-        if (blocked) {
-          // originURL is "" for main-frame loads — never let URL parsing
-          // flip a block decision into an allow.
-          const origin = originFromUrl(details.originURL);
-          if (origin) {
-            incrementBlockedCount(origin);
-          }
-        }
-        return blocked;
-      });
-
     return {
-      getBlockedCountForOrigin: (origin) =>
-        Effect.sync(() => perOriginCounts.get(origin) ?? 0),
       init,
-      matchRequest,
       resetBlockedCountForOrigin: (origin) =>
         Effect.sync(() => {
           perOriginCounts.delete(origin);

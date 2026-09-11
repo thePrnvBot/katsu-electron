@@ -5,7 +5,11 @@ import type { BrowserWindow } from "electron";
 import { DEFAULT_SETTINGS } from "../../shared/contract.js";
 import { IpcChannel } from "../../shared/ipc-channels.js";
 import { mainRuntime } from "../runtime.js";
-import { AdBlocker, originFromUrl } from "../services/ad-blocker.js";
+import {
+  AdBlocker,
+  decideAdBlockRequest,
+  originFromUrl,
+} from "../services/ad-blocker.js";
 import { Permissions } from "../services/permissions.js";
 import { Persistence } from "../services/persistence.js";
 import {
@@ -184,43 +188,23 @@ const resetAdblockNotify = (origin: string): void => {
 
 /**
  * Full blocking decision for one request: match, count, and notify the
- * renderer — as one effect so the unit can be run/tested end to end.
+ * renderer. Runs synchronously — this fires for every request on the
+ * session, and an Effect round trip per request dominated page loads.
  */
-const evaluateBlocking = (
-  details: Electron.OnBeforeRequestListenerDetails
-): Effect.Effect<{ cancel: boolean }, never, AdBlocker> =>
-  Effect.gen(function* blocking() {
-    const originURL = details.frame?.url || details.referrer || "";
-
-    const adBlocker = yield* AdBlocker;
-    const blocked = yield* adBlocker.matchRequest({
-      method: details.method,
-      originURL,
-      type: details.resourceType,
-      url: details.url,
-    });
-    const origin = blocked ? originFromUrl(originURL) : null;
-    if (!origin) {
-      return { cancel: blocked };
-    }
-    const count = yield* adBlocker.getBlockedCountForOrigin(origin);
-    notifyAdblockCount({ count, origin });
-    return { cancel: blocked };
-  });
-
 export const setupAdBlocking = (katsuSession: Electron.Session): void => {
   katsuSession.webRequest.onBeforeRequest(
     { urls: ["<all_urls>"] },
     (details, callback) => {
-      // Fail open on defects — a broken blocker must never take the
-      // network down with it — but leave a trace of why.
-      mainRuntime
-        .runPromise(evaluateBlocking(details))
-        .then(callback)
-        .catch((error) => {
-          console.error("Ad-block check failed; allowing request", error);
-          callback({ cancel: false });
-        });
+      const decision = decideAdBlockRequest({
+        method: details.method,
+        originURL: details.frame?.url || details.referrer || "",
+        type: details.resourceType,
+        url: details.url,
+      });
+      if (decision.notify) {
+        notifyAdblockCount(decision.notify);
+      }
+      callback({ cancel: decision.cancel });
     }
   );
 };
