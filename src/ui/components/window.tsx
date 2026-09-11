@@ -2,8 +2,10 @@ import { Maximize, ShieldBan, X } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import { Rnd } from "react-rnd";
 
+import type { PreviewType } from "../../shared/contract";
 import { useWebviewEvents } from "../hooks/use-webview-events";
 import {
+  APP_TITLEBAR_HEIGHT,
   getArrowDelta,
   PEEK_SCALE,
   WEBVIEW_LIVE_CELL_RADIUS,
@@ -29,6 +31,17 @@ const absoluteFill: React.CSSProperties = {
   width: "100%",
 };
 
+const suspensionStyle: React.CSSProperties = {
+  alignItems: "center",
+  color: "#777",
+  display: "flex",
+  inset: 0,
+  justifyContent: "center",
+  padding: 12,
+  position: "absolute",
+  textAlign: "center",
+};
+
 interface WindowBodyProps {
   isNearCamera: boolean;
   loadError: string | null;
@@ -37,6 +50,108 @@ interface WindowBodyProps {
   win: WindowData;
   windowId: string;
 }
+
+/** True when the window's bounds intersect the visible world rect. */
+const intersectsViewport = (
+  w: WindowData,
+  camera: { readonly x: number; readonly y: number },
+  grid: { readonly cellHeight: number; readonly cellWidth: number }
+): boolean => {
+  // Expanded by one cell so windows mount just before they scroll into view.
+  const minX = camera.x - grid.cellWidth;
+  const maxX = camera.x + grid.cellWidth * 2;
+  const minY = camera.y - APP_TITLEBAR_HEIGHT - grid.cellHeight;
+  const maxY = camera.y - APP_TITLEBAR_HEIGHT + grid.cellHeight * 2;
+  return w.x < maxX && w.x + w.w > minX && w.y < maxY && w.y + w.h > minY;
+};
+
+/** Windows that are never culled: maximized, terminals, and previews.
+ * Terminals own live PTY views; replaying a video would lose its position. */
+const isCullExempt = (w: WindowData): boolean =>
+  w.maximized === true || w.kind === "terminal" || w.previewType !== undefined;
+
+/** The webview / PDF iframe for a hydrated, URL-bearing window. */
+const WebviewContent = ({
+  isNearCamera,
+  keepWindowsAlive,
+  webviewRef,
+  win,
+}: {
+  isNearCamera: boolean;
+  keepWindowsAlive: boolean;
+  webviewRef: (element: Electron.WebviewTag | null) => void;
+  win: WindowData;
+}) => {
+  if (win.previewType === "pdf") {
+    // katsu:// PDFs are local staged files — the protocol handler only
+    // serves the drops dir. The viewer still runs sandboxed.
+    return (
+      <iframe
+        src={win.url}
+        sandbox="allow-scripts"
+        style={absoluteFill}
+        title={win.fileName || "PDF Preview"}
+      />
+    );
+  }
+  if (!isNearCamera && !keepWindowsAlive) {
+    return (
+      <div style={suspensionStyle}>
+        Suspended — return to this cell to reload
+      </div>
+    );
+  }
+  return (
+    <webview
+      ref={webviewRef}
+      src={win.url}
+      style={{
+        ...absoluteFill,
+        // keepWindowsAlive keeps far webviews mounted at full quality
+        // on purpose — hiding them here instead suspends their paint
+        // while the window frame stays in the viewport (blank void).
+        visibility: keepWindowsAlive || isNearCamera ? "visible" : "hidden",
+      }}
+      partition="persist:katsu"
+      webpreferences="contextIsolation=yes, sandbox=yes, nodeIntegration=no"
+    />
+  );
+};
+
+type WindowContentState =
+  | { readonly kind: "empty" }
+  | { readonly kind: "error"; readonly error: string }
+  | { readonly kind: "preview"; readonly previewType: PreviewType }
+  | { readonly kind: "suspended" }
+  | { readonly kind: "terminal" }
+  | { readonly kind: "webview" };
+
+/**
+ * What the window body should render this pass: restored windows start as
+ * "suspended" chrome-only shells and hydrate later; load errors win over
+ * everything else.
+ */
+const windowContentState = (
+  win: WindowData,
+  loadError: string | null
+): WindowContentState => {
+  if (!(win.live ?? true)) {
+    return { kind: "suspended" };
+  }
+  if (win.kind === "terminal") {
+    return { kind: "terminal" };
+  }
+  if (loadError !== null) {
+    return { error: loadError, kind: "error" };
+  }
+  if (win.previewType !== undefined && win.previewType !== "pdf") {
+    return { kind: "preview", previewType: win.previewType };
+  }
+  if (win.url) {
+    return { kind: "webview" };
+  }
+  return { kind: "empty" };
+};
 
 const WindowBody = ({
   isNearCamera,
@@ -47,8 +162,7 @@ const WindowBody = ({
   windowId,
 }: WindowBodyProps) => {
   const keepWindowsAlive = useSettingsStore((s) => s.settings.keepWindowsAlive);
-  const isTerminal = win.kind === "terminal";
-  const isComponentPreview = win.previewType && win.previewType !== "pdf";
+  const contentState = windowContentState(win, loadError);
 
   return (
     <div
@@ -59,84 +173,35 @@ const WindowBody = ({
         position: "relative",
       }}
     >
-      {isTerminal && <TerminalView windowId={windowId} />}
-      {!isTerminal && isComponentPreview && !loadError && (
+      {contentState.kind === "suspended" && (
+        <div style={suspensionStyle}>Suspended</div>
+      )}
+      {contentState.kind === "terminal" && <TerminalView windowId={windowId} />}
+      {contentState.kind === "preview" && (
         <FilePreview
           fileName={win.fileName ?? ""}
-          previewType={win.previewType}
+          previewType={contentState.previewType}
           url={win.url}
           windowId={windowId}
         />
       )}
-      {!isTerminal &&
-        !isComponentPreview &&
-        win.url &&
-        !loadError &&
-        (() => {
-          if (win.previewType === "pdf") {
-            // katsu:// PDFs are local staged files — the protocol handler only
-            // serves the drops dir. The viewer still runs sandboxed.
-            return (
-              <iframe
-                src={win.url}
-                sandbox="allow-scripts"
-                style={absoluteFill}
-                title={win.fileName || "PDF Preview"}
-              />
-            );
-          }
-          if (!isNearCamera && !keepWindowsAlive) {
-            return (
-              <div
-                style={{
-                  alignItems: "center",
-                  color: "#777",
-                  display: "flex",
-                  inset: 0,
-                  justifyContent: "center",
-                  padding: 12,
-                  position: "absolute",
-                  textAlign: "center",
-                }}
-              >
-                Suspended — return to this cell to reload
-              </div>
-            );
-          }
-          return (
-            <webview
-              ref={webviewRef}
-              src={win.url}
-              style={{
-                ...absoluteFill,
-                // keepWindowsAlive keeps far webviews mounted at full quality
-                // on purpose — hiding them here instead suspends their paint
-                // while the window frame stays in the viewport (blank void).
-                visibility:
-                  keepWindowsAlive || isNearCamera ? "visible" : "hidden",
-              }}
-              partition="persist:katsu"
-              webpreferences="contextIsolation=yes, sandbox=yes, nodeIntegration=no"
-            />
-          );
-        })()}
-      {loadError && (
-        <ErrorOverlay error={loadError} url={win.url} onRetry={retry} />
+      {contentState.kind === "webview" && (
+        <WebviewContent
+          isNearCamera={isNearCamera}
+          keepWindowsAlive={keepWindowsAlive}
+          webviewRef={webviewRef}
+          win={win}
+        />
       )}
-      {!isTerminal && !win.url && !loadError && (
-        <div
-          style={{
-            alignItems: "center",
-            color: "#777",
-            display: "flex",
-            inset: 0,
-            justifyContent: "center",
-            padding: 12,
-            position: "absolute",
-          }}
-        >
-          Empty window
-        </div>
+      {contentState.kind === "error" && (
+        <ErrorOverlay
+          error={contentState.error}
+          url={win.url}
+          onRetry={retry}
+        />
+      )}
+      {contentState.kind === "empty" && (
+        <div style={suspensionStyle}>Empty window</div>
       )}
     </div>
   );
@@ -183,6 +248,13 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
     );
   });
 
+  // Off-screen windows unmount entirely — the store keeps their state and
+  // the minimap keeps their position.
+  const isOnScreen = useCameraStore((s) => {
+    const w = useWindowStore.getState().windows[windowId];
+    return !w || isCullExempt(w) || intersectsViewport(w, s.camera, s.grid);
+  });
+
   useEffect(() => {
     if (!(showAdPill && winOrigin)) {
       return;
@@ -194,7 +266,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
     });
   }, [showAdPill, winOrigin, windowId]);
 
-  if (!win) {
+  if (!win || !isOnScreen) {
     return null;
   }
 

@@ -25,6 +25,10 @@ export const WEBVIEW_LIVE_CELL_RADIUS = 1;
 export const AUTO_HIDE_DELAY_MS = 2500;
 export const SHOW_THROTTLE_MS = 250;
 
+/** Stagger between window content mounts (workspace loads and restore
+ * hydration), spiralling out from the active cell. */
+export const WINDOW_MOUNT_STAGGER_MS = 150;
+
 /** z-index ladder — keep ordered. */
 export const Z_SEARCH_BAR = 40;
 export const Z_PERMISSION_DIALOG = 60;

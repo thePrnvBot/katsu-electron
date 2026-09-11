@@ -21,6 +21,7 @@ import {
 } from "./utils/file-preview";
 import { ignoreFailure } from "./utils/ignore-failure";
 import { centerBoundsInCell, computeWindowSize } from "./utils/layout";
+import { scheduleRestoreHydration } from "./utils/window-hydration";
 import {
   windowFromMetadata,
   windowMetadataFromWindow,
@@ -75,11 +76,14 @@ export const App = () => {
   const wheelAccum = useRef({ x: 0, y: 0 });
 
   // Load persisted state on mount — parsed at the boundary, no casts.
+  // Restored windows start suspended and hydrate outward from the active
+  // cell so app start does not mount every webview and PTY at once.
   useEffect(() => {
     window.electronAPI.setStateLoadedHandler((savedWindows) => {
       for (const savedWindow of savedWindows) {
-        addWindow(windowFromMetadata(savedWindow));
+        addWindow({ ...windowFromMetadata(savedWindow), live: false });
       }
+      scheduleRestoreHydration();
     });
 
     window.electronAPI.setSettingsLoadedHandler((savedSettings) => {

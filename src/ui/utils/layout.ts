@@ -4,6 +4,7 @@ import {
   WINDOW_BORDER,
   WINDOW_TITLEBAR_HEIGHT,
 } from "../lib/constants";
+import type { Window as WindowData } from "../store/window-store";
 
 export interface Size {
   readonly h: number;
@@ -70,3 +71,39 @@ export const windowCenterCell = (
   x: Math.floor((window.x + window.w / 2) / grid.cellWidth),
   y: Math.floor((window.y + window.h / 2) / grid.cellHeight),
 });
+
+/**
+ * Order windows outward from the active cell in a clockwise spiral:
+ * right, bottom-right, bottom, bottom-left, left, top-left, top,
+ * top-right, then the next ring. Screens have +y pointing down, so
+ * clockwise equals an increasing atan2 angle measured from east.
+ */
+const angleFromEast = (dx: number, dy: number): number => {
+  const angle = Math.atan2(dy, dx);
+  return angle < 0 ? angle + Math.PI * 2 : angle;
+};
+
+export const spiralFromActiveCell = (
+  windows: readonly WindowData[],
+  activeCell: { readonly x: number; readonly y: number },
+  grid: { readonly cellWidth: number; readonly cellHeight: number }
+): WindowData[] =>
+  windows.toSorted((a, b) => {
+    const aCell = windowCenterCell(a, grid);
+    const bCell = windowCenterCell(b, grid);
+    const aDx = aCell.x - activeCell.x;
+    const aDy = aCell.y - activeCell.y;
+    const bDx = bCell.x - activeCell.x;
+    const bDy = bCell.y - activeCell.y;
+    const ringDiff =
+      Math.max(Math.abs(aDx), Math.abs(aDy)) -
+      Math.max(Math.abs(bDx), Math.abs(bDy));
+    if (ringDiff !== 0) {
+      return ringDiff;
+    }
+    const angleDiff = angleFromEast(aDx, aDy) - angleFromEast(bDx, bDy);
+    if (angleDiff !== 0) {
+      return angleDiff;
+    }
+    return a.id.localeCompare(b.id);
+  });

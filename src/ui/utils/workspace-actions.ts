@@ -1,6 +1,7 @@
+import { WINDOW_MOUNT_STAGGER_MS } from "../lib/constants";
 import { useCameraStore } from "../store/camera-store";
 import { useWindowStore } from "../store/window-store";
-import { windowCenterCell } from "./layout";
+import { spiralFromActiveCell, windowCenterCell } from "./layout";
 import {
   windowFromMetadata,
   windowMetadataFromWindow,
@@ -11,6 +12,15 @@ import {
  * state, the main process owns the `workspaces.json` file. Errors are
  * returned as user-facing strings; null means success.
  */
+
+/** Timers of an in-flight staggered load so a new load can cancel them. */
+const pendingWorkspaceTimers: number[] = [];
+
+const cancelPendingWorkspaceLoad = (): void => {
+  for (const timer of pendingWorkspaceTimers.splice(0)) {
+    window.clearTimeout(timer);
+  }
+};
 
 export const saveCurrentWorkspace = async (
   name: string
@@ -42,11 +52,23 @@ export const loadWorkspaceByName = async (
     const windows = savedWindows
       .filter((w) => w.previewType === undefined)
       .map(windowFromMetadata);
-    useWindowStore.getState().replaceWindows(windows);
+    const { grid, currentCell } = useCameraStore.getState();
+    const ordered = spiralFromActiveCell(windows, currentCell, grid);
 
-    const [first] = windows;
+    // Mounting every webview/terminal at once stalls the renderer — stagger
+    // the mounts outward from the active cell so the app stays responsive.
+    cancelPendingWorkspaceLoad();
+    useWindowStore.getState().replaceWindows([]);
+    for (const [index, entry] of ordered.entries()) {
+      pendingWorkspaceTimers.push(
+        window.setTimeout(() => {
+          useWindowStore.getState().addWindow(entry);
+        }, index * WINDOW_MOUNT_STAGGER_MS)
+      );
+    }
+
+    const [first] = ordered;
     if (first) {
-      const { grid } = useCameraStore.getState();
       const cell = windowCenterCell(first, grid);
       useCameraStore.getState().moveToCell(cell.x, cell.y);
     }

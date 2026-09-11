@@ -26,6 +26,11 @@ export interface Window {
   readonly previewType?: PreviewType;
   /** Defaults to "webview" when absent. */
   readonly kind?: WindowKind;
+  /**
+   * Content lifecycle: false keeps the window as a cheap chrome-only shell
+   * (restored windows hydrate later); undefined/true mounts content.
+   */
+  readonly live?: boolean;
 }
 
 interface WindowState {
@@ -42,6 +47,8 @@ interface WindowState {
   setActiveWindow: (id: string | null) => void;
   bringToFront: (id: string) => void;
   maximizeWindow: (id: string) => void;
+  /** Mount a suspended window's content (restore hydration). */
+  hydrateWindow: (id: string) => void;
   setWindowLayout: (id: string, layout: WindowLayout) => void;
 }
 
@@ -79,6 +86,16 @@ export const useWindowStore = create<WindowState>((set) => ({
       return {
         activeWindowId: null,
         windows: {},
+      };
+    }),
+  hydrateWindow: (id) =>
+    set((s) => {
+      const target = s.windows[id];
+      if (!target) {
+        return s;
+      }
+      return {
+        windows: replaceOne(s.windows, id, { ...target, live: true }),
       };
     }),
   maximizeWindow: (id) =>
