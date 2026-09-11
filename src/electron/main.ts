@@ -163,6 +163,11 @@ app.on("ready", async () => {
 
   setMainWindow(mainWindow);
 
+  // Grid cells are sized from the viewport when the renderer loads, so start
+  // maximized — the default cell size is the monitor work area rather than
+  // the launch window, and no manual "Refresh Grid Size" is needed.
+  mainWindow.maximize();
+
   const loadPromise = isDev()
     ? mainWindow.loadURL("http://localhost:5123")
     : mainWindow.loadFile(
