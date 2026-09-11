@@ -24,6 +24,10 @@ interface Grid {
 interface CameraState {
   camera: { readonly x: number; readonly y: number };
   cameraTarget: { readonly x: number; readonly y: number };
+  /** The cell the camera has actually reached — lags currentCell during a
+   * pan so distance-based mount decisions flip once per cell step, never
+   * mid-animation. */
+  settledCell: { readonly x: number; readonly y: number };
   grid: Grid;
   currentCell: { readonly x: number; readonly y: number };
 
@@ -80,4 +84,5 @@ export const useCameraStore = create<CameraState>((set, get) => ({
     }),
   setCamera: (x, y) => set({ camera: { x, y } }),
   setCameraTarget: (x, y) => set({ cameraTarget: { x, y } }),
+  settledCell: { x: 0, y: 0 },
 }));

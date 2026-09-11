@@ -20,6 +20,13 @@ export const WHEEL_CELL_THRESHOLD = 80;
 export const PEEK_SCALE = 0.9;
 /** Webviews this many cells away (Chebyshev) stay mounted. */
 export const WEBVIEW_LIVE_CELL_RADIUS = 1;
+/**
+ * Upper bound on guest webviews kept mounted (hidden) after their window
+ * leaves the camera, so returning to a recently visited cell reuses the
+ * renderer instead of reloading the page. Memory scales with this — each
+ * guest is a full browser tab.
+ */
+export const MAX_WARM_WEBVIEWS = 12;
 
 /** Auto-hide chrome (search bar, minimap). */
 export const AUTO_HIDE_DELAY_MS = 2500;

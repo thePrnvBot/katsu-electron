@@ -19,6 +19,9 @@ export const CameraAnimator = () => {
       if (Math.abs(dx) < EPSILON && Math.abs(dy) < EPSILON) {
         useCameraStore.setState({
           camera: { x: state.cameraTarget.x, y: state.cameraTarget.y },
+          // The camera has arrived — mount decisions (live/cull tiers) may
+          // flip now that the pan is over.
+          settledCell: { ...state.currentCell },
         });
         running = false;
         return;

@@ -5,7 +5,6 @@ import { Rnd } from "react-rnd";
 import type { PreviewType } from "../../shared/contract";
 import { useWebviewEvents } from "../hooks/use-webview-events";
 import {
-  APP_TITLEBAR_HEIGHT,
   getArrowDelta,
   PEEK_SCALE,
   WEBVIEW_LIVE_CELL_RADIUS,
@@ -13,8 +12,10 @@ import {
 } from "../lib/constants";
 import { useCameraStore } from "../store/camera-store";
 import { useSettingsStore } from "../store/settings-store";
+import { useWarmWebviewsStore } from "../store/warm-webviews-store";
 import { useWindowStore } from "../store/window-store";
 import type { Window as WindowData } from "../store/window-store";
+import { windowCenterCell } from "../utils/layout";
 import { ErrorOverlay } from "./error-overlay";
 import { FilePreview } from "./file-preview";
 import { TerminalView } from "./terminal-view";
@@ -44,6 +45,7 @@ const suspensionStyle: React.CSSProperties = {
 
 interface WindowBodyProps {
   isNearCamera: boolean;
+  isWarm: boolean;
   loadError: string | null;
   retry: () => void;
   webviewRef: (element: Electron.WebviewTag | null) => void;
@@ -51,33 +53,32 @@ interface WindowBodyProps {
   windowId: string;
 }
 
-/** True when the window's bounds intersect the visible world rect. */
-const intersectsViewport = (
-  w: WindowData,
-  camera: { readonly x: number; readonly y: number },
-  grid: { readonly cellHeight: number; readonly cellWidth: number }
-): boolean => {
-  // Expanded by one cell so windows mount just before they scroll into view.
-  const minX = camera.x - grid.cellWidth;
-  const maxX = camera.x + grid.cellWidth * 2;
-  const minY = camera.y - APP_TITLEBAR_HEIGHT - grid.cellHeight;
-  const maxY = camera.y - APP_TITLEBAR_HEIGHT + grid.cellHeight * 2;
-  return w.x < maxX && w.x + w.w > minX && w.y < maxY && w.y + w.h > minY;
+/** Chebyshev distance in grid cells between a window's center and the
+ * camera's settled cell. */
+const cellDistanceFromCamera = (
+  window: WindowData,
+  camera: {
+    readonly settledCell: { readonly x: number; readonly y: number };
+    readonly grid: { readonly cellHeight: number; readonly cellWidth: number };
+  }
+): number => {
+  const cell = windowCenterCell(window, camera.grid);
+  return Math.max(
+    Math.abs(cell.x - camera.settledCell.x),
+    Math.abs(cell.y - camera.settledCell.y)
+  );
 };
-
-/** Windows that are never culled: maximized, terminals, and previews.
- * Terminals own live PTY views; replaying a video would lose its position. */
-const isCullExempt = (w: WindowData): boolean =>
-  w.maximized === true || w.kind === "terminal" || w.previewType !== undefined;
 
 /** The webview / PDF iframe for a hydrated, URL-bearing window. */
 const WebviewContent = ({
   isNearCamera,
+  isWarm,
   keepWindowsAlive,
   webviewRef,
   win,
 }: {
   isNearCamera: boolean;
+  isWarm: boolean;
   keepWindowsAlive: boolean;
   webviewRef: (element: Electron.WebviewTag | null) => void;
   win: WindowData;
@@ -94,7 +95,8 @@ const WebviewContent = ({
       />
     );
   }
-  if (!isNearCamera && !keepWindowsAlive) {
+  const shouldMount = isNearCamera || isWarm || keepWindowsAlive;
+  if (!shouldMount) {
     return (
       <div style={suspensionStyle}>
         Suspended — return to this cell to reload
@@ -107,10 +109,9 @@ const WebviewContent = ({
       src={win.url}
       style={{
         ...absoluteFill,
-        // keepWindowsAlive keeps far webviews mounted at full quality
-        // on purpose — hiding them here instead suspends their paint
-        // while the window frame stays in the viewport (blank void).
-        visibility: keepWindowsAlive || isNearCamera ? "visible" : "hidden",
+        // Warm-but-far webviews keep their renderer (and page state) alive
+        // while staying hidden; near windows paint normally.
+        visibility: isNearCamera || keepWindowsAlive ? "visible" : "hidden",
       }}
       partition="persist:katsu"
       webpreferences="contextIsolation=yes, sandbox=yes, nodeIntegration=no"
@@ -155,6 +156,7 @@ const windowContentState = (
 
 const WindowBody = ({
   isNearCamera,
+  isWarm,
   loadError,
   retry,
   webviewRef,
@@ -188,6 +190,7 @@ const WindowBody = ({
       {contentState.kind === "webview" && (
         <WebviewContent
           isNearCamera={isNearCamera}
+          isWarm={isWarm}
           keepWindowsAlive={keepWindowsAlive}
           webviewRef={webviewRef}
           win={win}
@@ -218,6 +221,8 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
   const maximizeWindow = useWindowStore((s) => s.maximizeWindow);
   const bringToFront = useWindowStore((s) => s.bringToFront);
   const removeWindow = useWindowStore((s) => s.removeWindow);
+  const warmWebview = useWarmWebviewsStore((s) => s.warm);
+  const forgetWebview = useWarmWebviewsStore((s) => s.forget);
   const [blockedCount, setBlockedCount] = useState(0);
 
   const { loadError, retry, webviewRef } = useWebviewEvents(windowId);
@@ -233,27 +238,33 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
     }
   }, [winUrl]);
 
+  // Distance decisions use the camera's settled cell, so tiers flip once per
+  // cell step — never mid-pan. Flipping mount state while moving destroys
+  // and respawns guest renderers, the main traversal stutter with heavy
+  // pages.
   const isNearCamera = useCameraStore((s) => {
     const w = useWindowStore.getState().windows[windowId];
     if (!w || !isWebUrl(w.url)) {
       return true;
     }
-    const cellX = Math.floor((w.x + w.w / 2) / s.grid.cellWidth);
-    const cellY = Math.floor((w.y + w.h / 2) / s.grid.cellHeight);
-    return (
-      Math.max(
-        Math.abs(cellX - s.currentCell.x),
-        Math.abs(cellY - s.currentCell.y)
-      ) <= WEBVIEW_LIVE_CELL_RADIUS
-    );
+    return cellDistanceFromCamera(w, s) <= WEBVIEW_LIVE_CELL_RADIUS;
   });
 
-  // Off-screen windows unmount entirely — the store keeps their state and
-  // the minimap keeps their position.
-  const isOnScreen = useCameraStore((s) => {
-    const w = useWindowStore.getState().windows[windowId];
-    return !w || isCullExempt(w) || intersectsViewport(w, s.camera, s.grid);
-  });
+  const isWarm = useWarmWebviewsStore((s) => s.warmIds.includes(windowId));
+
+  // Recently visible webviews stay mounted (hidden) so returning reuses the
+  // renderer; removed windows leave the pool.
+  useEffect(() => {
+    if (isNearCamera && isWebUrl(winUrl)) {
+      warmWebview(windowId);
+    }
+  }, [isNearCamera, warmWebview, winUrl, windowId]);
+
+  useEffect(() => {
+    if (win === undefined) {
+      forgetWebview(windowId);
+    }
+  }, [forgetWebview, win, windowId]);
 
   useEffect(() => {
     if (!(showAdPill && winOrigin)) {
@@ -266,7 +277,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
     });
   }, [showAdPill, winOrigin, windowId]);
 
-  if (!win || !isOnScreen) {
+  if (!win) {
     return null;
   }
 
@@ -381,6 +392,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
 
       <WindowBody
         isNearCamera={isNearCamera}
+        isWarm={isWarm}
         loadError={loadError}
         retry={retry}
         webviewRef={webviewRef}
