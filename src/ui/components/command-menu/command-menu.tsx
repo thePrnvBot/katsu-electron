@@ -40,7 +40,12 @@ export const CommandMenu = ({ openTerminal }: CommandMenuProps) => {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+      // Match the physical key (`e.code`) so non-Latin keyboard layouts
+      // (e.g. Cyrillic) still toggle the menu; Caps Lock changes `e.key`.
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        (e.code === "KeyK" || e.key.toLowerCase() === "k")
+      ) {
         e.preventDefault();
         setOpen((o) => !o);
       }
