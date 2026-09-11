@@ -5,6 +5,7 @@ import type { PreviewType } from "../../shared/contract";
 import {
   AUDIO_EXTENSIONS,
   IMAGE_EXTENSIONS,
+  MARKDOWN_EXTENSIONS,
   VIDEO_EXTENSIONS,
   TEXT_EXTENSIONS,
 } from "../lib/constants";
@@ -26,7 +27,11 @@ export interface FilePreviewResult {
   url: string;
 }
 
-const getPreviewType = (mimeType: string, fileName: string): PreviewType => {
+/** Classify a file from its MIME type and name into a preview kind. */
+export const getPreviewType = (
+  mimeType: string,
+  fileName: string
+): PreviewType => {
   if (mimeType.startsWith("image/") || mimeType === "image/svg+xml") {
     return "image";
   }
@@ -53,6 +58,9 @@ const getPreviewType = (mimeType: string, fileName: string): PreviewType => {
   }
   if (ext === "pdf") {
     return "pdf";
+  }
+  if (MARKDOWN_EXTENSIONS.has(ext) || mimeType === "text/markdown") {
+    return "markdown";
   }
   if (
     TEXT_EXTENSIONS.has(ext) ||

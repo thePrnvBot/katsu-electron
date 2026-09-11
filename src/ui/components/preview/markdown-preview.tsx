@@ -1,16 +1,30 @@
-/** Text file preview body with a streaming size cap. */
+/** Markdown file preview body rendered with TanStack Markdown. */
 
+import { Markdown } from "@tanstack/markdown/react";
+import type { ComponentPropsWithoutRef } from "react";
 import { useEffect, useState } from "react";
 
 import { readTextPreview } from "../../utils/text-preview-content";
 import { PreviewPlaceholder } from "./preview-placeholder";
 
-interface TextPreviewProps {
+interface MarkdownPreviewProps {
   fileName: string;
   url: string;
 }
 
-export const TextPreview = ({ fileName, url }: TextPreviewProps) => {
+type MarkdownAnchorProps = ComponentPropsWithoutRef<"a">;
+
+/**
+ * Markdown links open as new windows so the app's window-open handler sends
+ * http(s) targets to the system browser instead of navigating the preview.
+ */
+const MarkdownAnchor = ({ children, ...props }: MarkdownAnchorProps) => (
+  <a {...props} rel="noopener noreferrer" target="_blank">
+    {children}
+  </a>
+);
+
+export const MarkdownPreview = ({ fileName, url }: MarkdownPreviewProps) => {
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -18,7 +32,7 @@ export const TextPreview = ({ fileName, url }: TextPreviewProps) => {
     let cancelled = false;
     const controller = new AbortController();
 
-    const loadText = async () => {
+    const loadMarkdown = async () => {
       setError(false);
       setContent(null);
 
@@ -38,7 +52,7 @@ export const TextPreview = ({ fileName, url }: TextPreviewProps) => {
       }
     };
 
-    loadText();
+    loadMarkdown();
 
     return () => {
       cancelled = true;
@@ -46,14 +60,12 @@ export const TextPreview = ({ fileName, url }: TextPreviewProps) => {
     };
   }, [url]);
 
-  const ext = fileName.split(".").pop() ?? "text";
-
   if (error) {
     return (
       <PreviewPlaceholder
         icon="⚠️"
         title={fileName}
-        subtitle="Failed to load file content"
+        subtitle="Failed to load Markdown content"
       />
     );
   }
@@ -63,44 +75,28 @@ export const TextPreview = ({ fileName, url }: TextPreviewProps) => {
       <PreviewPlaceholder
         icon="⏳"
         title={fileName}
-        subtitle="Loading file content..."
+        subtitle="Loading Markdown content..."
       />
     );
   }
 
   return (
     <div
+      className="markdown-preview"
       style={{
         background: "#0f0f0f",
-        color: "#d4d4d4",
-        fontFamily: "'Geist Mono', 'Fira Code', monospace",
-        fontSize: 13,
         height: "100%",
-        lineHeight: 1.6,
         overflow: "auto",
-        padding: 16,
+        padding: "16px 20px",
       }}
     >
-      <div
-        style={{
-          borderBottom: "1px solid #222",
-          color: "#666",
-          fontSize: 11,
-          marginBottom: 12,
-          paddingBottom: 8,
-        }}
-      >
-        {fileName} — {ext}
-      </div>
-      <pre
-        style={{
-          tabSize: 2,
-          whiteSpace: "pre-wrap",
-          wordWrap: "break-word",
-        }}
+      <Markdown
+        allowHtml={false}
+        components={{ a: MarkdownAnchor }}
+        headingAnchors={false}
       >
         {content}
-      </pre>
+      </Markdown>
     </div>
   );
 };

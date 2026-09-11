@@ -14,6 +14,7 @@ export type PreviewType =
   | "video"
   | "audio"
   | "pdf"
+  | "markdown"
   | "download";
 
 export interface Bounds {

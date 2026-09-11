@@ -41,6 +41,7 @@ const PreviewTypeSchema: Schema.Schema<PreviewType> = Schema.Literal(
   "video",
   "audio",
   "pdf",
+  "markdown",
   "download"
 );
 

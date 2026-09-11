@@ -94,13 +94,15 @@ export const AUDIO_EXTENSIONS = new Set([
   "wma",
 ]);
 
+/** Markdown previews get rendered; other text extensions stay raw. */
+export const MARKDOWN_EXTENSIONS = new Set(["md", "markdown"]);
+
 export const TEXT_EXTENSIONS = new Set([
   "ts",
   "tsx",
   "js",
   "jsx",
   "json",
-  "md",
   "css",
   "html",
   "htm",
