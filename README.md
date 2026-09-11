@@ -6,7 +6,7 @@ A desktop web browser built with Electron, React, and TypeScript featuring a uni
 
 - **3D Spatial Interface** — Navigate a grid-based virtual world where browser windows exist as movable, resizable objects in 2D space with camera panning and zoom
 - **Built-in Ad Blocking** — Powered by uBlock Origin's static filtering engine for fast, privacy-focused browsing
-- **File Previews** — Open and preview images, videos, audio, text, Markdown, PDFs, and downloads directly in the spatial interface
+- **File Previews** — Open and preview images, videos, audio, text, Markdown, PDFs, and downloads directly in the spatial interface, with Shiki syntax highlighting for code files
 - **Window Layouts** — Snap windows to predefined layouts (half, quarter, centered) within the current grid cell
 - **Custom Protocol** — `katsu://` protocol for internal navigation and file previews
 - **Window Persistence** — Save and restore your window layout across sessions
@@ -17,7 +17,7 @@ A desktop web browser built with Electron, React, and TypeScript featuring a uni
 
 ## Tech Stack
 
-- **Frontend**: React 19, TypeScript, Tailwind CSS v4, Zustand, Vite, TanStack Markdown
+- **Frontend**: React 19, TypeScript, Tailwind CSS v4, Zustand, Vite, TanStack Markdown, Shiki
 - **Backend**: Electron 43, Effect (TypeScript ecosystem)
 - **Build**: electron-builder, Ultracite (linting/formatting), Husky (git hooks), Knip (dead code detection)
 - **Ad Blocking**: @gorhill/ubo-core
