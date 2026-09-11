@@ -1,3 +1,5 @@
+/** Anti-slop oxlint plugin entry registering its rules. */
+
 import { definePlugin } from "@oxlint/plugins";
 
 import { noChainedTypeAssertionsRule } from "./rules/no-chained-type-assertions.ts";

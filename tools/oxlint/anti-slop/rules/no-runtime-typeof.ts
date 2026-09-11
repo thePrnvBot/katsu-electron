@@ -1,3 +1,5 @@
+/** Rule rejecting runtime typeof narrowing. */
+
 import { defineRule } from "@oxlint/plugins";
 
 /** Disallow runtime typeof checks that narrow unparsed values instead of decoding them. */

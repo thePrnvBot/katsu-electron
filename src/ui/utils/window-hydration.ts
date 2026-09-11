@@ -1,3 +1,5 @@
+/** Staggered content hydration for restored windows. */
+
 import { WINDOW_MOUNT_STAGGER_MS } from "../lib/constants";
 import { useCameraStore } from "../store/camera-store";
 import { useWindowStore } from "../store/window-store";

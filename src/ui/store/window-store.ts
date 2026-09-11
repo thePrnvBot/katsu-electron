@@ -1,3 +1,5 @@
+/** Window set state: add, update, remove, focus, maximize, layouts. */
+
 import { create } from "zustand";
 
 import type { Bounds, PreviewType, WindowKind } from "../../shared/contract";

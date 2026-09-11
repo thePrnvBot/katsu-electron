@@ -138,6 +138,10 @@ katsu-electron/
 
 The Electron main process uses [Effect](https://effect.website/) for structured concurrency, dependency injection, and error handling. Services are defined as Effect contexts and composed via layers in `layers/main-layer.ts`.
 
+### Window lifecycle
+
+The main window launches maximized, so grid cells size to the monitor work area from the start. Restored windows come back as suspended, chrome-only shells and hydrate outward from the active cell, so startup never mounts every page at once. While navigating, mount decisions apply only when the camera settles on a cell: nearby windows stay live, a bounded pool of recently visited windows keeps its renderer warm (`MAX_WARM_WEBVIEWS`), and the rest suspend until visited again.
+
 ### IPC Communication
 
 The renderer communicates with the main process through typed IPC. The unified `katsu:command` envelope is schema-validated and supports:
@@ -153,7 +157,7 @@ Dedicated invoke channels cover native dialogs, file staging, PTY terminals, wor
 
 ### Ad Blocking
 
-Requests are intercepted via Electron's `webRequest` API and matched against uBlock Origin filter lists. Blocked counts are tracked per-origin and displayed in the UI.
+Requests are intercepted via Electron's `webRequest` API and matched against uBlock Origin filter lists. Decisions are synchronous with a bounded per-URL cache, and blocked counts are tracked per-origin and displayed in the UI.
 
 ### Session Management
 

@@ -1,3 +1,5 @@
+/** uBO engine wrapper: single-flight init, selfie cache, synchronous match decisions. */
+
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";

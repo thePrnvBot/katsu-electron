@@ -1,3 +1,5 @@
+/** Rule rejecting widening known values to open types. */
+
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
 

@@ -1,3 +1,5 @@
+/** HTTP Range header parsing for the katsu:// file protocol. */
+
 export interface ByteRange {
   readonly start: number;
   readonly end: number;

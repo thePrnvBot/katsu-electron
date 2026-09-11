@@ -1,3 +1,5 @@
+/** Global styles: Geist font, fixed viewport, drag regions. */
+
 @import "tailwindcss";
 
 @font-face {

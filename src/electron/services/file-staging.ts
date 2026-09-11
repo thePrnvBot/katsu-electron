@@ -1,3 +1,5 @@
+/** One-shot capability grants for files picked in the native open dialog. */
+
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

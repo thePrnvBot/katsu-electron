@@ -1,3 +1,5 @@
+/** Rule rejecting data-shape names in symbols. */
+
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 

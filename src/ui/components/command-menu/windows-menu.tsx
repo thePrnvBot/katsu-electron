@@ -1,3 +1,5 @@
+/** Palette page listing and focusing open windows. */
+
 import { Command } from "cmdk";
 import { useShallow } from "zustand/react/shallow";
 

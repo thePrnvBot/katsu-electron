@@ -1,3 +1,5 @@
+/** Tagged errors for file-backed persistence. */
+
 import * as Data from "effect/Data";
 
 export type PersistenceErrorReason =

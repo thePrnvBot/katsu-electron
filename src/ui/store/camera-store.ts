@@ -1,3 +1,5 @@
+/** Camera and grid state: pan targets and viewport-sized cells. */
+
 import { create } from "zustand";
 
 import { APP_TITLEBAR_HEIGHT, GRID_COLS, GRID_ROWS } from "../lib/constants";

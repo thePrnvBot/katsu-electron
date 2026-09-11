@@ -1,3 +1,5 @@
+/** Schema decode at IPC boundaries; parse errors stay typed for callers to map. */
+
 import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
 import type * as ParseResult from "effect/ParseResult";

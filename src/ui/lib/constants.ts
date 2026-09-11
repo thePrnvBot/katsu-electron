@@ -1,3 +1,5 @@
+/** Shared renderer constants: grid, timing, radii, z-index ladder. */
+
 export const GRID_COLS = 10;
 export const GRID_ROWS = 10;
 

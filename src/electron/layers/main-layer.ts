@@ -1,3 +1,5 @@
+/** Composes every main-process service into a single Effect layer. */
+
 import * as Layer from "effect/Layer";
 
 import { AdBlockerLive } from "../services/ad-blocker.js";

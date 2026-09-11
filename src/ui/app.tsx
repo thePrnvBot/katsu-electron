@@ -1,3 +1,5 @@
+/** App root: persisted state wiring, camera input, file opening, composition. */
+
 import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 

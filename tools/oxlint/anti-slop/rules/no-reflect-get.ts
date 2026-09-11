@@ -1,3 +1,5 @@
+/** Rule rejecting Reflect.get. */
+
 import { defineRule } from "@oxlint/plugins";
 
 import { isGlobalReflectMethodCall } from "../shared/reflect-method.ts";

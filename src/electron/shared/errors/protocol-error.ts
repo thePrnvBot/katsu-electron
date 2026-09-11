@@ -1,3 +1,5 @@
+/** Tagged errors for the katsu:// protocol handler. */
+
 import * as Data from "effect/Data";
 
 export type ProtocolErrorReason =

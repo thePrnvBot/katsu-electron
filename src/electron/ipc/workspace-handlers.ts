@@ -1,3 +1,5 @@
+/** Workspace IPC handlers: list, save, load, and delete named window setups. */
+
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { ipcMain } from "electron";

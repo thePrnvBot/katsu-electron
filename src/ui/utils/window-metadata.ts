@@ -1,3 +1,5 @@
+/** Converters between window state and persisted metadata. */
+
 import type { WindowMetadata } from "../../shared/contract";
 import type { Window as WindowData } from "../store/window-store";
 

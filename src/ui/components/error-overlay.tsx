@@ -1,3 +1,5 @@
+/** Full-body error state with a retry action. */
+
 import { AlertCircle, RefreshCw } from "lucide-react";
 
 interface ErrorOverlayProps {

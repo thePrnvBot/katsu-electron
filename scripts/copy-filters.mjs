@@ -1,3 +1,5 @@
+/** Copies bundled uBlock filter lists into dist-electron for dev runs and packaged builds. */
+
 import fs from "node:fs/promises";
 import path from "node:path";
 

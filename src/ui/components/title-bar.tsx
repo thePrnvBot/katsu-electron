@@ -1,3 +1,5 @@
+/** Frameless window controls: close, minimize, maximize. */
+
 const handleClose = () =>
   window.electronAPI.sendCommand({
     payload: "close",

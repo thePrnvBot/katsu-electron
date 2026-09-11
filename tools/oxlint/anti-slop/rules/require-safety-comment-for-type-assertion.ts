@@ -1,3 +1,5 @@
+/** Rule requiring justification comments on type assertions. */
+
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree, SourceCode } from "@oxlint/plugins";
 

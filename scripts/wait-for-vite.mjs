@@ -1,3 +1,5 @@
+/** Blocks until the Vite dev server responds, then Electron launches against it. */
+
 import { setTimeout as delay } from "node:timers/promises";
 
 const url = process.argv[2] ?? "http://localhost:5123";

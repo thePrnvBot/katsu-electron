@@ -1,3 +1,5 @@
+/** Tagged errors for PTY terminal operations. */
+
 import * as Data from "effect/Data";
 
 export type TerminalErrorReason =

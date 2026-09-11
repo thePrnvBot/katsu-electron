@@ -1,3 +1,5 @@
+/** Pure workspace library helpers: upsert and remove by name. */
+
 import type { WindowMetadata } from "../../shared/contract.js";
 
 /** One named window setup stored in `workspaces.json`. */

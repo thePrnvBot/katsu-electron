@@ -1,3 +1,5 @@
+/** Geometry helpers: cell fitting, centering, spiral ordering. */
+
 import {
   DEFAULT_CONTENT_HEIGHT,
   DEFAULT_CONTENT_WIDTH,

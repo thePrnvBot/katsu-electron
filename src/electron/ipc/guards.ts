@@ -1,3 +1,5 @@
+/** Shared IPC guardrails: main-window sender assertion and boundary payload decode. */
+
 import * as Effect from "effect/Effect";
 import type * as Schema from "effect/Schema";
 import type { IpcMainInvokeEvent } from "electron";

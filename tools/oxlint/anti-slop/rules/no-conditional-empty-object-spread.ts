@@ -1,3 +1,5 @@
+/** Rule rejecting conditional empty object spreads. */
+
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 

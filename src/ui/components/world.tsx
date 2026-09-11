@@ -1,3 +1,5 @@
+/** Pannable world canvas hosting windows and the grid backdrop. */
+
 import { useEffect, useRef } from "react";
 
 import { useFileDrop } from "../hooks/use-file-drop";

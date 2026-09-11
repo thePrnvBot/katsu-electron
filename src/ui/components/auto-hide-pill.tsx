@@ -1,3 +1,5 @@
+/** Edge tab that re-reveals auto-hidden chrome on hover. */
+
 interface AutoHidePillProps {
   hidden: boolean;
   onShow: () => void;

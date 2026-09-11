@@ -1,3 +1,5 @@
+/** Session setup: protocol handling, permission gates, UA cleaning, ad-block wiring, nav guards. */
+
 import * as Effect from "effect/Effect";
 import { app, protocol, session, shell } from "electron";
 import type { BrowserWindow } from "electron";

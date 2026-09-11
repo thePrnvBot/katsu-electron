@@ -1,3 +1,5 @@
+/** Placeholder body for files without a preview. */
+
 import { PreviewPlaceholder } from "./preview-placeholder";
 
 interface DownloadPreviewProps {

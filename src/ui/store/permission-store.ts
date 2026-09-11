@@ -1,3 +1,5 @@
+/** Queue of permission requests awaiting the dialog. */
+
 import { create } from "zustand";
 
 import type { PermissionRequestPayload } from "../../shared/contract";

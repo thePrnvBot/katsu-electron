@@ -1,3 +1,5 @@
+/** JSX typings for the webview tag. */
+
 import type { HTMLAttributes, Ref } from "react";
 
 declare module "react" {

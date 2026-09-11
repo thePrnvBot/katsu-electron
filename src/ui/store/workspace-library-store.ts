@@ -1,3 +1,5 @@
+/** Cached menu view of the saved workspace library. */
+
 import { create } from "zustand";
 
 import type { WorkspaceSummary } from "../../shared/contract";

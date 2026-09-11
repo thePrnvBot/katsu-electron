@@ -1,3 +1,5 @@
+/** User settings with load and toggles. */
+
 import { create } from "zustand";
 
 import { DEFAULT_SETTINGS } from "../../shared/contract";

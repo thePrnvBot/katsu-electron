@@ -1,3 +1,5 @@
+/** Runtime-validated Effect schemas mirroring the shared IPC contract. */
+
 import * as Schema from "effect/Schema";
 
 import type {

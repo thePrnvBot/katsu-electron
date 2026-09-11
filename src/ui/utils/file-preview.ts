@@ -1,3 +1,5 @@
+/** Classifies dropped and staged files and builds preview URLs. */
+
 import { MAX_TEMP_FILE_BYTES } from "../../shared/contract";
 import type { PreviewType } from "../../shared/contract";
 import {

@@ -1,3 +1,5 @@
+/** Bounded LRU pool of guest webviews kept warm across cells. */
+
 import { create } from "zustand";
 
 import { MAX_WARM_WEBVIEWS } from "../lib/constants";

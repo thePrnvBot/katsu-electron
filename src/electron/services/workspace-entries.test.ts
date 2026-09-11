@@ -1,3 +1,5 @@
+/** Tests for workspace library upsert and removal. */
+
 import { describe, expect, it } from "vitest";
 
 import type { WindowMetadata } from "../../shared/contract";

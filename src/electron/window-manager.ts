@@ -1,3 +1,5 @@
+/** Holds the main BrowserWindow reference for IPC and event wiring. */
+
 import type { BrowserWindow } from "electron";
 
 let mainWindow: BrowserWindow | null = null;

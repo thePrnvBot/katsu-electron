@@ -1,3 +1,5 @@
+/** Shared empty-state placeholder for preview bodies. */
+
 interface PreviewPlaceholderProps {
   icon: string;
   title: string;

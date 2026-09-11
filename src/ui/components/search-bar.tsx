@@ -1,3 +1,5 @@
+/** Auto-hiding URL bar and file-open entry point. */
+
 import { ArrowRight, FileUp } from "lucide-react";
 import { useState } from "react";
 

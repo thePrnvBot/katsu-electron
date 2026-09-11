@@ -1,3 +1,5 @@
+/** Palette page applying snap layouts to the active window. */
+
 import { Command } from "cmdk";
 
 import { useWindowStore } from "../../store/window-store";

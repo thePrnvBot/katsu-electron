@@ -1,3 +1,5 @@
+/** Rule rejecting unknown-typed type aliases. */
+
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 

@@ -1,3 +1,5 @@
+/** Tests for HTTP Range header parsing. */
+
 import { describe, expect, it } from "vitest";
 
 import { parseRangeHeader } from "./byte-range";

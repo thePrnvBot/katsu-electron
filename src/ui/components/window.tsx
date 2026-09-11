@@ -1,3 +1,5 @@
+/** Window chrome, drag and resize handling, and mounted content tiers. */
+
 import { Maximize, ShieldBan, X } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import { Rnd } from "react-rnd";

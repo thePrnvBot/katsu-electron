@@ -1,3 +1,5 @@
+/** Timed auto-hide with throttled re-show for chrome. */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AUTO_HIDE_DELAY_MS, SHOW_THROTTLE_MS } from "../lib/constants";

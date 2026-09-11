@@ -1,3 +1,5 @@
+/** Palette page toggling settings and refreshing the grid. */
+
 import { Command } from "cmdk";
 import { Check } from "lucide-react";
 

@@ -1,3 +1,5 @@
+/** Rule rejecting object-typed function parameters. */
+
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree, SourceCode } from "@oxlint/plugins";
 

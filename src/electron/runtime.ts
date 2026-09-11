@@ -1,3 +1,5 @@
+/** One managed Effect runtime for the main process; services resolve once. */
+
 import * as ManagedRuntime from "effect/ManagedRuntime";
 
 import { MainLayer } from "./layers/main-layer.js";

@@ -1,3 +1,5 @@
+/** Snap-layout bounds resolved against the current cell. */
+
 import type { Bounds } from "../../shared/contract";
 
 export type WindowLayout =

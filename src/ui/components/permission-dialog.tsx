@@ -1,3 +1,5 @@
+/** Modal dialog approving or denying camera and microphone requests. */
+
 import { useEffect, useRef } from "react";
 
 import { Z_PERMISSION_DIALOG } from "../lib/constants";

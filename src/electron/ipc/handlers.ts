@@ -1,3 +1,5 @@
+/** IPC entry: registers the unified command router and each domain handler group. */
+
 import * as Effect from "effect/Effect";
 import { ipcMain } from "electron";
 

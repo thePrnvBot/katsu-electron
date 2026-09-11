@@ -1,3 +1,5 @@
+/** Quit coordination: request renderer state, save it, then tear down and exit. */
+
 import * as Effect from "effect/Effect";
 import { app } from "electron";
 

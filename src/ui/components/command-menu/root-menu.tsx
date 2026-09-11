@@ -1,3 +1,5 @@
+/** Palette root: navigation and global actions. */
+
 import { Command } from "cmdk";
 
 import { useWindowStore } from "../../store/window-store";

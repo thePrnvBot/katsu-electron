@@ -1,3 +1,5 @@
+/** Grid overview for jumping between cells. */
+
 import { useEffect, useState } from "react";
 
 import { useAutoHide } from "../hooks/use-auto-hide";

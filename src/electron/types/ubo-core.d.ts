@@ -1,3 +1,5 @@
+/** Ambient typings for the subset of @gorhill/ubo-core the blocker uses. */
+
 declare module "@gorhill/ubo-core" {
   interface MatchRequestDetails {
     url: string;

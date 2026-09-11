@@ -1,3 +1,5 @@
+/** Electron entry: single-instance lock, privileged scheme registration, main window lifecycle. */
+
 import path from "node:path";
 
 import * as Effect from "effect/Effect";

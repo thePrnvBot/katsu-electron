@@ -1,3 +1,5 @@
+/** Palette page saving and loading named workspaces. */
+
 import { Command } from "cmdk";
 import { useEffect, useState } from "react";
 

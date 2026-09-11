@@ -1,3 +1,5 @@
+/** Main-process utilities: paths, atomic writes, temp-name sanitization, drops cleanup. */
+
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";

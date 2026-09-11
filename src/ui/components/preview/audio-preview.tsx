@@ -1,3 +1,5 @@
+/** Audio file preview body. */
+
 interface AudioPreviewProps {
   fileName: string;
   url: string;

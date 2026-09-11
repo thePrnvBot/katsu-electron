@@ -1,3 +1,5 @@
+/** Renderer entry: mounts the React root. */
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 

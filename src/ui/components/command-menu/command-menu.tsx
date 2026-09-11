@@ -1,3 +1,5 @@
+/** Global command palette (Cmd/Ctrl+K) with nested pages. */
+
 import { Command } from "cmdk";
 import { useEffect, useState } from "react";
 

@@ -1,3 +1,5 @@
+/** Rule rejecting widen-then-assert casts. */
+
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree, Variable } from "@oxlint/plugins";
 

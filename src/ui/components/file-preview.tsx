@@ -1,3 +1,5 @@
+/** Dispatches a preview body by preview type. */
+
 import type { PreviewType } from "../../shared/contract";
 import { AudioPreview } from "./preview/audio-preview";
 import { DownloadPreview } from "./preview/download-preview";

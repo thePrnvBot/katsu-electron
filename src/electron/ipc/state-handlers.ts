@@ -1,3 +1,5 @@
+/** Quit-time IPC handler persisting renderer window state before shutdown. */
+
 import * as Effect from "effect/Effect";
 import { ipcMain } from "electron";
 

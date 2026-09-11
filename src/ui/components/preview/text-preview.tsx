@@ -1,3 +1,5 @@
+/** Text file preview body with a streaming size cap. */
+
 import { useEffect, useState } from "react";
 
 import { PreviewPlaceholder } from "./preview-placeholder";

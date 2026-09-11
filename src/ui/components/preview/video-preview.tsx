@@ -1,3 +1,5 @@
+/** Video file preview body. */
+
 import { useState } from "react";
 
 import { PreviewPlaceholder } from "./preview-placeholder";

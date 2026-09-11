@@ -1,3 +1,5 @@
+/** Pans the camera to center a window's cell. */
+
 import { useCallback } from "react";
 
 import { useCameraStore } from "../store/camera-store";

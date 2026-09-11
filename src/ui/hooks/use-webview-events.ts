@@ -1,3 +1,5 @@
+/** Webview listener wiring: page titles and load errors. */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useWindowStore } from "../store/window-store";

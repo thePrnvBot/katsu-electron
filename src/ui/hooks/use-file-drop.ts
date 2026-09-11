@@ -1,3 +1,5 @@
+/** Drag-and-drop handling for opening files. */
+
 import { useCallback, useRef, useState } from "react";
 
 interface UseFileDropOptions {

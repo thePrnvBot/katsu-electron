@@ -1,3 +1,5 @@
+/** Rule rejecting module mocking. */
+
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
 

@@ -1,3 +1,5 @@
+/** Camera and microphone permission flow: renderer dialog, timeout, grant memory. */
+
 import crypto from "node:crypto";
 
 import * as Context from "effect/Context";

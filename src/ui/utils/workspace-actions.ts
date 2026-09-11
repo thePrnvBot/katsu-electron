@@ -1,3 +1,5 @@
+/** Workspace save, load, and delete actions over IPC. */
+
 import { WINDOW_MOUNT_STAGGER_MS } from "../lib/constants";
 import { useCameraStore } from "../store/camera-store";
 import { useWindowStore } from "../store/window-store";

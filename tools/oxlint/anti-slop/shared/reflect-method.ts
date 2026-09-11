@@ -1,3 +1,5 @@
+/** Shared Reflect-method detection helper for the anti-slop rules. */
+
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
 
 function resolveVariable(

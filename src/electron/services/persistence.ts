@@ -1,3 +1,5 @@
+/** File-backed state, settings, and workspace storage with serialized atomic writes. */
+
 import fs from "node:fs/promises";
 
 import * as Context from "effect/Context";

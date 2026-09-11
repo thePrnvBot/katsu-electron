@@ -1,3 +1,5 @@
+/** PTY IPC handlers: spawn, write, resize, kill terminal sessions. */
+
 import * as Effect from "effect/Effect";
 import { ipcMain } from "electron";
 

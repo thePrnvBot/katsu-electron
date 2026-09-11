@@ -1,3 +1,5 @@
+/** Tagged errors for the unified IPC command router. */
+
 import * as Data from "effect/Data";
 
 export type IPCErrorReason =

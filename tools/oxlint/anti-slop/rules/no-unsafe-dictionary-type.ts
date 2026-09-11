@@ -1,3 +1,5 @@
+/** Rule rejecting unsafe dictionary typing. */
+
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 

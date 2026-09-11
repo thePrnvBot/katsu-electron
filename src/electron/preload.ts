@@ -1,3 +1,5 @@
+/** Context bridge exposing the typed renderer API: commands, terminal streams, state handlers. */
+
 import { contextBridge, ipcRenderer } from "electron";
 
 import type {

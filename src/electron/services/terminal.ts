@@ -1,3 +1,5 @@
+/** PTY session management: spawn, IO relay to the renderer, resize, kill. */
+
 import crypto from "node:crypto";
 import os from "node:os";
 

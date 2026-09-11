@@ -1,3 +1,5 @@
+/** Native dialog and file-staging IPC handlers: open, save, delete, stage. */
+
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";

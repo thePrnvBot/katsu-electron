@@ -1,3 +1,5 @@
+/** Shared dictionary typing helpers for the anti-slop rules. */
+
 import type { ESTree } from "@oxlint/plugins";
 
 const BUILT_INS = new Set([

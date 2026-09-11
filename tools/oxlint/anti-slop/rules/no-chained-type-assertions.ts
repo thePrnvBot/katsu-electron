@@ -1,3 +1,5 @@
+/** Rule rejecting consecutive as-casts. */
+
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 

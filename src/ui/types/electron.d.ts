@@ -1,3 +1,5 @@
+/** Typed shape of the preload-exposed electronAPI bridge. */
+
 import type {
   BlockedCountPayload,
   IPCCommand,

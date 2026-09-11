@@ -1,3 +1,5 @@
+/** Eases the camera toward its target each animation frame. */
+
 import { useEffect } from "react";
 
 import { useCameraStore } from "../store/camera-store";

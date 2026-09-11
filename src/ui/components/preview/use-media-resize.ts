@@ -1,3 +1,5 @@
+/** Sizes a preview window to its media's native dimensions. */
+
 import { useCallback } from "react";
 
 import { useCameraStore } from "../../store/camera-store";
