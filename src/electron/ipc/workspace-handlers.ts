@@ -11,6 +11,22 @@ import { WorkspaceSavePayloadSchema } from "../schemas/ipc-schemas.js";
 import { Persistence } from "../services/persistence.js";
 import { assertMainWindowSender, decodePayload } from "./guards.js";
 
+/**
+ * Single source of truth for workspace names: save trims, so load and
+ * delete must compare trimmed names too — otherwise saved " Work " is
+ * stored as "Work" but unretrievable.
+ */
+const decodeWorkspaceName = async (name: string): Promise<string> => {
+  const parsed = await mainRuntime.runPromise(
+    decodePayload(Schema.String, name, "invalid workspace name")
+  );
+  const trimmed = parsed.trim();
+  if (trimmed.length === 0) {
+    throw new Error("Workspace name cannot be empty");
+  }
+  return trimmed;
+};
+
 export const registerWorkspaceHandlers = (): void => {
   // Workspace: list saved workspaces (name + window count), sorted by name.
   ipcMain.handle(IpcChannel.workspaceList, async (event) => {
@@ -41,10 +57,7 @@ export const registerWorkspaceHandlers = (): void => {
           "invalid workspace save payload"
         )
       );
-      const name = parsed.name.trim();
-      if (name.length === 0) {
-        throw new Error("Workspace name cannot be empty");
-      }
+      const name = await decodeWorkspaceName(parsed.name);
       await mainRuntime.runPromise(
         Effect.gen(function* saveWorkspace() {
           const persistence = yield* Persistence;
@@ -57,9 +70,7 @@ export const registerWorkspaceHandlers = (): void => {
   // Workspace: load saved windows by name (null when the name is unknown).
   ipcMain.handle(IpcChannel.workspaceLoad, async (event, name: string) => {
     assertMainWindowSender(event);
-    const parsedName = await mainRuntime.runPromise(
-      decodePayload(Schema.String, name, "invalid workspace name")
-    );
+    const parsedName = await decodeWorkspaceName(name);
     return await mainRuntime.runPromise(
       Effect.gen(function* loadWorkspace() {
         const persistence = yield* Persistence;
@@ -75,9 +86,7 @@ export const registerWorkspaceHandlers = (): void => {
   // Workspace: delete a saved workspace by name (no-op when unknown).
   ipcMain.handle(IpcChannel.workspaceDelete, async (event, name: string) => {
     assertMainWindowSender(event);
-    const parsedName = await mainRuntime.runPromise(
-      decodePayload(Schema.String, name, "invalid workspace name")
-    );
+    const parsedName = await decodeWorkspaceName(name);
     await mainRuntime.runPromise(
       Effect.gen(function* deleteWorkspace() {
         const persistence = yield* Persistence;
