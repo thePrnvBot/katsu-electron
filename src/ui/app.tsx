@@ -63,6 +63,13 @@ const processSequentially = async <T,>(
   return failed + (await processSequentially(items, operation, index + 1));
 };
 
+const isWindowContent = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement &&
+  target.closest("[data-window-content]") !== null;
+
+const isTitleBar = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement && target.closest(".titlebar") !== null;
+
 export const App = () => {
   const moveCell = useCameraStore((s) => s.moveCell);
   const currentCell = useCameraStore((s) => s.currentCell);
@@ -133,6 +140,10 @@ export const App = () => {
       if (e.target.tagName === "IFRAME" || e.target.tagName === "WEBVIEW") {
         return;
       }
+      // Scrollable window content (previews, terminal) handles its own scroll.
+      if (isWindowContent(e.target) || isTitleBar(e.target)) {
+        return;
+      }
 
       wheelAccum.current.x += e.deltaX;
       wheelAccum.current.y += e.deltaY;
@@ -157,6 +168,11 @@ export const App = () => {
         return;
       }
       if (e.target instanceof HTMLElement && e.target.closest("[cmdk-root]")) {
+        return;
+      }
+      // Terminal and other window content own arrow keys (xterm history,
+      // scrolling); the titlebar owns Shift/Alt arrow nudging.
+      if (isWindowContent(e.target) || isTitleBar(e.target)) {
         return;
       }
       // Permission dialog is modal — arrow keys must not pan the camera behind it.

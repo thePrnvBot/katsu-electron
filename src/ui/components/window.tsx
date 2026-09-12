@@ -170,6 +170,7 @@ const WindowBody = ({
 
   return (
     <div
+      data-window-content=""
       style={{
         background: "#0f0f0f",
         flex: 1,
