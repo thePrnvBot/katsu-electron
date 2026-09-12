@@ -101,6 +101,8 @@ export const App = () => {
   }, [addWindow, loadSettings]);
 
   // Persist settings whenever they change (e.g. windowPeeking toggle).
+  // Writes are serialized: rapid toggles each capture their snapshot up
+  // front, so a slow older write can never land after a newer one.
   useEffect(() => {
     const persistSettings = async (settings: Settings): Promise<void> => {
       try {
@@ -110,9 +112,14 @@ export const App = () => {
       }
     };
 
+    let writeQueue: Promise<void> = Promise.resolve();
     const unsub = useSettingsStore.subscribe((state, prev) => {
       if (state.settings !== prev.settings) {
-        void persistSettings(state.settings);
+        const snapshot = state.settings;
+        writeQueue = (async () => {
+          await writeQueue;
+          await persistSettings(snapshot);
+        })();
       }
     });
     return unsub;
