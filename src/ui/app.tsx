@@ -195,6 +195,23 @@ export const App = () => {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [moveCell]);
 
+  // Grid cells size to the viewport, so a native resize (window resize,
+  // maximize/unmaximize) must rescale the grid or maximized windows and
+  // camera targets drift. Debounced so drag-resize doesn't thrash state.
+  const refreshGridSize = useCameraStore((s) => s.refreshGridSize);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onResize = () => {
+      clearTimeout(timer);
+      timer = setTimeout(refreshGridSize, 100);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [refreshGridSize]);
+
   const activateWindow = (id: string) => {
     setActiveWindow(id);
     bringToFront(id);
