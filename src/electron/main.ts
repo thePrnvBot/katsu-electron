@@ -20,7 +20,7 @@ import {
   setupKatsuSession,
   setupWebContentsListeners,
 } from "./session/setup.js";
-import { cleanDropsDir, isDev } from "./util.js";
+import { cleanArtifactWorkspaces, cleanDropsDir, isDev } from "./util.js";
 import { getMainWindow, setMainWindow } from "./window-manager.js";
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -139,6 +139,7 @@ app.on("ready", async () => {
 
   // Wipe preview drops orphaned by a previous run before anything can serve them.
   await mainRuntime.runPromise(cleanDropsDir());
+  await mainRuntime.runPromise(cleanArtifactWorkspaces());
 
   registerIpcHandlers();
   registerWindowControlHandler();
@@ -155,9 +156,11 @@ app.on("ready", async () => {
         app.getAppPath(),
         "dist-electron",
         "electron",
-        "preload.js"
+        "preload.cjs"
       ),
-      sandbox: false,
+      // The preload only uses contextBridge + ipcRenderer, both available to
+      // sandboxed preloads — so the renderer is fully sandboxed.
+      sandbox: true,
       webviewTag: true,
     },
     width: 1400,

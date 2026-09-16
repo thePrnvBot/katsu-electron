@@ -1,6 +1,14 @@
 /** Typed shape of the preload-exposed electronAPI bridge. */
 
+// Electron's global namespace (WebviewTag, event types) for renderer code.
+/// <reference types="electron" />
+
 import type {
+  ArtifactCancelResponse,
+  ArtifactProgressEvent,
+  ArtifactProviderId,
+  ArtifactProviderSummary,
+  ArtifactStartResponse,
   BlockedCountPayload,
   IPCCommand,
   IPCResult,
@@ -15,8 +23,17 @@ import type {
 } from "../../shared/contract";
 
 export interface ElectronAPI {
+  /** Cancel a running artifact generation (its workspace is removed). */
+  cancelArtifact: (generationId: string) => Promise<ArtifactCancelResponse>;
   /** Delete a temp preview file inside the drops dir. */
   deleteTempFile: (filePath: string) => Promise<void>;
+  /** Start a local sandboxed artifact generation. */
+  generateArtifact: (
+    prompt: string,
+    providerId: ArtifactProviderId
+  ) => Promise<ArtifactStartResponse>;
+  /** List local agent providers and whether they are installed. */
+  listArtifactProviders: () => Promise<ArtifactProviderSummary[]>;
   /** Native open dialog; grants stage capability for the picked paths. */
   openFile: () => Promise<{
     canceled: boolean;
@@ -38,8 +55,17 @@ export interface ElectronAPI {
   /** Delete a saved workspace by name (no-op when the name is unknown). */
   deleteWorkspace: (name: string) => Promise<void>;
   sendCommand: (command: IPCCommand) => Promise<IPCResult>;
+  /** Subscribe to progress for one generation. Returns an unsubscribe fn. */
+  setArtifactProgressHandler: (
+    generationId: string,
+    handler: (event: ArtifactProgressEvent) => void
+  ) => () => void;
+  /**
+   * Subscribe to blocked-ad counts for one origin (pre-filtered in preload).
+   * Returns an unsubscribe fn.
+   */
   setBlockedCountHandler: (
-    subscriberId: string,
+    origin: string,
     handler: (data: BlockedCountPayload) => void
   ) => () => void;
   setPermissionCancelledHandler: (handler: (requestId: string) => void) => void;
