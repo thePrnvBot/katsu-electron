@@ -206,15 +206,31 @@ export const AdBlockerLive = Layer.effect(
     const ready = yield* Deferred.make<null, AdBlockerError>();
     let initStarted = false;
 
+    /**
+     * Keep the counts users are actually watching: when the cap is hit,
+     * evict the smallest count first — resetting a heavily-blocked origin
+     * mid-session is far more visible than dropping a rarely-hit one.
+     */
+    const evictSmallestCount = (): void => {
+      let smallestOrigin: string | null = null;
+      let smallestCount = Number.POSITIVE_INFINITY;
+      for (const [origin, count] of perOriginCounts) {
+        if (count < smallestCount) {
+          smallestOrigin = origin;
+          smallestCount = count;
+        }
+      }
+      if (smallestOrigin !== null) {
+        perOriginCounts.delete(smallestOrigin);
+      }
+    };
+
     const incrementBlockedCount = (origin: string): void => {
       if (
         !perOriginCounts.has(origin) &&
         perOriginCounts.size >= MAX_TRACKED_ORIGINS
       ) {
-        const oldest = perOriginCounts.keys().next().value;
-        if (oldest !== undefined) {
-          perOriginCounts.delete(oldest);
-        }
+        evictSmallestCount();
       }
       perOriginCounts.set(origin, (perOriginCounts.get(origin) ?? 0) + 1);
     };

@@ -22,7 +22,29 @@ import { isDev } from "../util.js";
 import { getMainWindow } from "../window-manager.js";
 
 const chromeVersion = process.versions.chrome;
-export const cleanUserAgent = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
+
+/**
+ * Per-platform UA platform token and `sec-ch-ua-platform` client hint, so a
+ * macOS/Linux build does not claim to be Windows.
+ */
+const UA_PLATFORMS = {
+  darwin: { clientHint: "macOS", token: "Macintosh; Intel Mac OS X 10_15_7" },
+  linux: { clientHint: "Linux", token: "X11; Linux x86_64" },
+  win32: { clientHint: "Windows", token: "Windows NT 10.0; Win64; x64" },
+} as const;
+
+// SAFETY: the `in` check above narrows the key to the object's own keys.
+const uaPlatform =
+  process.platform in UA_PLATFORMS
+    ? UA_PLATFORMS[process.platform as keyof typeof UA_PLATFORMS]
+    : UA_PLATFORMS.linux;
+
+export const cleanUserAgent = `Mozilla/5.0 (${uaPlatform.token}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
+export const cleanClientHints = {
+  "sec-ch-ua": `"Chromium";v="${chromeVersion}", "Google Chrome";v="${chromeVersion}", "Not.A/Brand";v="99"`,
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": `"${uaPlatform.clientHint}"`,
+} as const;
 
 const DEV_ORIGIN = "http://localhost:5123";
 
@@ -107,18 +129,15 @@ export const setupKatsuSession = (): Electron.Session => {
   katsuSession.webRequest.onBeforeSendHeaders(
     { urls: ["<all_urls>"] },
     (details, callback) => {
-      const requestHeaders: Record<string, string> = {};
-      // Copy all headers except User-Agent variants (case-insensitive).
-      for (const [key, value] of Object.entries(details.requestHeaders)) {
-        if (key.toLowerCase() !== "user-agent") {
-          requestHeaders[key] = value;
-        }
+      const requestHeaders = {
+        ...details.requestHeaders,
+        ...cleanClientHints,
+        "User-Agent": cleanUserAgent,
+      };
+      // Kill lowercase UA variants Electron does not normalize.
+      if ("user-agent" in requestHeaders) {
+        delete requestHeaders["user-agent"];
       }
-      requestHeaders["User-Agent"] = cleanUserAgent;
-      requestHeaders["sec-ch-ua"] =
-        `"Chromium";v="${chromeVersion}", "Google Chrome";v="${chromeVersion}", "Not.A/Brand";v="99"`;
-      requestHeaders["sec-ch-ua-mobile"] = "?0";
-      requestHeaders["sec-ch-ua-platform"] = `"Windows"`;
       callback({ cancel: false, requestHeaders });
     }
   );

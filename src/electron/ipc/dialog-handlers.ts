@@ -17,6 +17,36 @@ import { getDropsDir, isPathInside, sanitizeTempFileName } from "../util.js";
 import { getMainWindow } from "../window-manager.js";
 import { assertMainWindowSender, decodePayload } from "./guards.js";
 
+/**
+ * Resolve a path through the filesystem (symlinks resolved) and keep it
+ * only when the real target still lives inside the drops dir. Mirrors the
+ * katsu:// protocol validation so a symlink swap inside drops cannot point
+ * deletes anywhere else.
+ */
+const resolveRealPathInsideDrops = async (
+  filePath: string
+): Promise<string | null> => {
+  try {
+    const resolved = await fs.realpath(path.resolve(filePath));
+    const realDropsDir = await fs.realpath(getDropsDir());
+    return isPathInside(realDropsDir, resolved) ? resolved : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Symlink-resolved view of a granted source path, so the stat and the copy
+ * observe the same file even if the path's target changes between them.
+ */
+const resolveRealPath = async (filePath: string): Promise<string | null> => {
+  try {
+    return await fs.realpath(path.resolve(filePath));
+  } catch {
+    return null;
+  }
+};
+
 export const registerDialogHandlers = (): void => {
   // Dialog: open file (grants stage capability for the picked paths)
   ipcMain.handle(IpcChannel.dialogOpenFile, async (event) => {
@@ -55,12 +85,8 @@ export const registerDialogHandlers = (): void => {
     if (!grantedBeforeValidation) {
       throw new Error("Path was not granted by the open dialog");
     }
-    const dir = getDropsDir();
-    await fs.mkdir(dir, { recursive: true });
-    const sourceStat = await fs.stat(parsedFilePath);
-    if (sourceStat.size > MAX_TEMP_FILE_BYTES) {
-      throw new Error("File exceeds maximum allowed size");
-    }
+    // Consume the grant first, then stat and copy the symlink-resolved
+    // source so the size check and the copy observe the same file.
     const granted = await mainRuntime.runPromise(
       Effect.gen(function* consumeGrant() {
         const staging = yield* FileStaging;
@@ -70,12 +96,22 @@ export const registerDialogHandlers = (): void => {
     if (!granted) {
       throw new Error("Path was not granted by the open dialog");
     }
+    const realSource = await resolveRealPath(parsedFilePath);
+    if (realSource === null) {
+      throw new Error("Granted file no longer exists");
+    }
+    const dir = getDropsDir();
+    await fs.mkdir(dir, { recursive: true });
+    const sourceStat = await fs.stat(realSource);
+    if (sourceStat.size > MAX_TEMP_FILE_BYTES) {
+      throw new Error("File exceeds maximum allowed size");
+    }
     const stagedPath = path.join(
       dir,
-      `${crypto.randomUUID()}-${sanitizeTempFileName(path.basename(parsedFilePath))}`
+      `${crypto.randomUUID()}-${sanitizeTempFileName(path.basename(realSource))}`
     );
-    await fs.copyFile(parsedFilePath, stagedPath);
-    return { name: path.basename(parsedFilePath), path: stagedPath };
+    await fs.copyFile(realSource, stagedPath);
+    return { name: path.basename(realSource), path: stagedPath };
   });
 
   // FS: delete a temp preview file (must live inside the drops dir)
@@ -86,8 +122,8 @@ export const registerDialogHandlers = (): void => {
       const parsedFilePath = await mainRuntime.runPromise(
         decodePayload(Schema.String, filePath, "invalid temp file path")
       );
-      const resolved = path.resolve(parsedFilePath);
-      if (!isPathInside(getDropsDir(), resolved)) {
+      const resolved = await resolveRealPathInsideDrops(parsedFilePath);
+      if (resolved === null) {
         return;
       }
       await fs.rm(resolved, { force: true });
@@ -106,9 +142,6 @@ export const registerDialogHandlers = (): void => {
           "invalid temp file payload"
         )
       );
-      if (!(parsed.buffer instanceof ArrayBuffer)) {
-        throw new Error("Invalid temp file buffer");
-      }
       if (parsed.buffer.byteLength > MAX_TEMP_FILE_BYTES) {
         throw new Error("File exceeds maximum allowed size");
       }

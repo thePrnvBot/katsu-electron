@@ -9,6 +9,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { getMimeType } from "../../shared/file-types.js";
 import { ProtocolError } from "../shared/errors/protocol-error.js";
 import { getDropsDir, isPathInside } from "../util.js";
 import { parseRangeHeader } from "./byte-range.js";
@@ -21,47 +22,6 @@ export interface ProtocolHandler {
 
 export const ProtocolHandler =
   Context.GenericTag<ProtocolHandler>("ProtocolHandler");
-
-const MIME_TYPES = new Map([
-  [".aac", "audio/aac"],
-  [".avi", "video/x-msvideo"],
-  [".bmp", "image/bmp"],
-  [".css", "text/css"],
-  [".flac", "audio/flac"],
-  [".gif", "image/gif"],
-  [".go", "text/x-go"],
-  [".html", "text/html"],
-  [".ico", "image/x-icon"],
-  [".jpeg", "image/jpeg"],
-  [".jpg", "image/jpeg"],
-  [".js", "text/javascript"],
-  [".json", "application/json"],
-  [".jsx", "text/javascript"],
-  [".katsu-html", "text/html"],
-  [".m4a", "audio/mp4"],
-  [".md", "text/markdown"],
-  [".mkv", "video/x-matroska"],
-  [".mov", "video/quicktime"],
-  [".mp3", "audio/mpeg"],
-  [".mp4", "video/mp4"],
-  [".ogg", "audio/ogg"],
-  [".pdf", "application/pdf"],
-  [".png", "image/png"],
-  [".py", "text/x-python"],
-  [".rs", "text/x-rust"],
-  [".svg", "image/svg+xml"],
-  [".ts", "text/typescript"],
-  [".tsx", "text/typescript"],
-  [".txt", "text/plain"],
-  [".wav", "audio/wav"],
-  [".webm", "video/webm"],
-  [".webp", "image/webp"],
-]);
-
-const getMimeType = (filePath: string): string => {
-  const ext = path.extname(filePath).toLowerCase();
-  return MIME_TYPES.get(ext) ?? "application/octet-stream";
-};
 
 interface ValidatedFile {
   readonly resolved: string;
@@ -155,11 +115,23 @@ const webStream = (stream: Readable): ReadableStream<Uint8Array> => {
   });
 };
 
-const baseHeaders = (mimeType: string) => ({
-  "Accept-Ranges": "bytes",
-  "Content-Type": mimeType,
-  "X-Content-Type-Options": "nosniff",
-});
+/**
+ * Generated HTML is untrusted: lock it to inline resources only, so it can
+ * fetch nothing from the network or the host app.
+ */
+const HTML_CSP =
+  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; form-action 'none'; base-uri 'none'";
+
+const baseHeaders = (mimeType: string): Headers => {
+  const headers = new Headers();
+  headers.set("Accept-Ranges", "bytes");
+  headers.set("Content-Type", mimeType);
+  headers.set("X-Content-Type-Options", "nosniff");
+  if (mimeType === "text/html") {
+    headers.set("Content-Security-Policy", HTML_CSP);
+  }
+  return headers;
+};
 
 export const ProtocolHandlerLive = Layer.succeed(ProtocolHandler, {
   handleRequest: (request: Request) =>
@@ -188,22 +160,23 @@ export const ProtocolHandlerLive = Layer.succeed(ProtocolHandler, {
           end: range.end,
           start: range.start,
         });
+        const headers = baseHeaders(mimeType);
+        headers.set("Content-Length", String(range.end - range.start + 1));
+        headers.set(
+          "Content-Range",
+          `bytes ${range.start}-${range.end}/${size}`
+        );
         return new Response(webStream(stream), {
-          headers: {
-            ...baseHeaders(mimeType),
-            "Content-Length": String(range.end - range.start + 1),
-            "Content-Range": `bytes ${range.start}-${range.end}/${size}`,
-          },
+          headers,
           status: 206,
         });
       }
 
       const stream = createReadStream(resolved);
+      const headers = baseHeaders(mimeType);
+      headers.set("Content-Length", String(size));
       return new Response(webStream(stream), {
-        headers: {
-          ...baseHeaders(mimeType),
-          "Content-Length": String(size),
-        },
+        headers,
         status: 200,
       });
     }),

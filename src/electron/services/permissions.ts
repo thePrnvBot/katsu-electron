@@ -48,6 +48,12 @@ export const Permissions = Context.GenericTag<Permissions>("Permissions");
 export const PermissionsLive = Layer.sync(Permissions, () => {
   /** id -> reply slot for requests the renderer has not answered yet. */
   const pendingRequests = new Map<string, Deferred.Deferred<boolean>>();
+  /**
+   * Granted permissions live only in memory, so every app launch re-asks:
+   * a deliberate privacy default — camera/mic grants never outlive the
+   * process. Persisting this set would need the same atomic-write pipeline
+   * Persistence uses.
+   */
   const grantedPermissions = new Set<string>();
 
   const requestPermission: Permissions["requestPermission"] = ({

@@ -27,6 +27,56 @@ const resolveShell = (): string => {
   return process.env.SHELL ?? DEFAULT_SHELL_POSIX;
 };
 
+/** Kill a PTY; Windows ConPTY can throw on an already-dead handle. */
+const killSession = (session: pty.IPty): void => {
+  try {
+    session.kill();
+  } catch {
+    // Already dead — nothing to do.
+  }
+};
+
+interface OutputBatcher {
+  flushNow: () => void;
+  push: (chunk: string) => void;
+}
+
+/**
+ * Batch PTY output into ~16ms frames: a chatty process (`cat` a large file)
+ * emits an `onData` per chunk, and one IPC send per chunk floods the
+ * renderer. Batches over the byte cap flush immediately to bound latency.
+ */
+const makeOutputBatcher = (flush: (data: string) => void): OutputBatcher => {
+  const FLUSH_MS = 16;
+  const MAX_BATCH_BYTES = 64 * 1024;
+  let buffer = "";
+  let timer: NodeJS.Timeout | null = null;
+
+  const flushNow = (): void => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    if (buffer.length > 0) {
+      const data = buffer;
+      buffer = "";
+      flush(data);
+    }
+  };
+
+  return {
+    flushNow,
+    push: (chunk: string) => {
+      buffer += chunk;
+      if (buffer.length >= MAX_BATCH_BYTES) {
+        flushNow();
+        return;
+      }
+      timer ??= setTimeout(flushNow, FLUSH_MS);
+    },
+  };
+};
+
 /** Push a PTY event to the renderer — a no-op once the window is gone. */
 type TerminalEventPayload = TerminalDataPayload | TerminalExitPayload;
 
@@ -95,11 +145,15 @@ export const TerminalServiceLive = Layer.sync(TerminalService, () => {
           rows: options.rows,
         });
 
-        session.onData((data) => {
+        const outputBatcher = makeOutputBatcher((data) => {
           sendToMainWindow(IpcChannel.terminalData, { data, id });
         });
+        session.onData(outputBatcher.push);
         session.onExit(({ exitCode }) => {
           sessions.delete(id);
+          // Flush the pending batch first so trailing output lands before
+          // the exit event, then report the exit.
+          outputBatcher.flushNow();
           sendToMainWindow(IpcChannel.terminalExit, { exitCode, id });
         });
 
@@ -136,14 +190,17 @@ export const TerminalServiceLive = Layer.sync(TerminalService, () => {
 
   const kill: TerminalService["kill"] = (id) =>
     Effect.sync(() => {
-      sessions.get(id)?.kill();
-      sessions.delete(id);
+      const session = sessions.get(id);
+      if (session) {
+        killSession(session);
+        sessions.delete(id);
+      }
     });
 
   const killAll: TerminalService["killAll"] = () =>
     Effect.sync(() => {
       for (const session of sessions.values()) {
-        session.kill();
+        killSession(session);
       }
       sessions.clear();
     });
