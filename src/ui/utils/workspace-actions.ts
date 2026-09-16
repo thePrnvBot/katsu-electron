@@ -4,7 +4,9 @@ import { WINDOW_MOUNT_STAGGER_MS } from "../lib/constants";
 import { useCameraStore } from "../store/camera-store";
 import { useWindowStore } from "../store/window-store";
 import { spiralFromActiveCell, windowCenterCell } from "./layout";
+import { scheduleStaggered } from "./staggered";
 import {
+  isPersistableWindow,
   windowFromMetadata,
   windowMetadataFromWindow,
 } from "./window-metadata";
@@ -15,15 +17,6 @@ import {
  * returned as user-facing strings; null means success.
  */
 
-/** Timers of an in-flight staggered load so a new load can cancel them. */
-const pendingWorkspaceTimers: number[] = [];
-
-const cancelPendingWorkspaceLoad = (): void => {
-  for (const timer of pendingWorkspaceTimers.splice(0)) {
-    window.clearTimeout(timer);
-  }
-};
-
 export const saveCurrentWorkspace = async (
   name: string
 ): Promise<string | null> => {
@@ -31,9 +24,8 @@ export const saveCurrentWorkspace = async (
   if (trimmed.length === 0) {
     return "Type a name for the workspace first.";
   }
-  // Preview windows reference temp files wiped between runs — exclude them.
   const metadata = Object.values(useWindowStore.getState().windows)
-    .filter((w) => w.previewType === undefined)
+    .filter(isPersistableWindow)
     .map(windowMetadataFromWindow);
   try {
     await window.electronAPI.saveWorkspace(trimmed, metadata);
@@ -52,22 +44,17 @@ export const loadWorkspaceByName = async (
       return `Workspace "${name}" was not found.`;
     }
     const windows = savedWindows
-      .filter((w) => w.previewType === undefined)
+      .filter(isPersistableWindow)
       .map(windowFromMetadata);
     const { grid, currentCell } = useCameraStore.getState();
     const ordered = spiralFromActiveCell(windows, currentCell, grid);
 
     // Mounting every webview/terminal at once stalls the renderer — stagger
     // the mounts outward from the active cell so the app stays responsive.
-    cancelPendingWorkspaceLoad();
     useWindowStore.getState().replaceWindows([]);
-    for (const [index, entry] of ordered.entries()) {
-      pendingWorkspaceTimers.push(
-        window.setTimeout(() => {
-          useWindowStore.getState().addWindow(entry);
-        }, index * WINDOW_MOUNT_STAGGER_MS)
-      );
-    }
+    scheduleStaggered(ordered, (entry) => {
+      useWindowStore.getState().addWindow(entry);
+    }, WINDOW_MOUNT_STAGGER_MS);
 
     const [first] = ordered;
     if (first) {

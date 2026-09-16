@@ -2,27 +2,6 @@
 
 const MAX_TEXT_PREVIEW_BYTES = 16 * 1024 * 1024;
 
-const readTextStream = async (
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  decoder: TextDecoder,
-  chunks: string[],
-  bytesRead: number
-): Promise<string> => {
-  const result = await reader.read();
-  if (result.done) {
-    chunks.push(decoder.decode());
-    return chunks.join("");
-  }
-
-  const nextBytesRead = bytesRead + result.value.byteLength;
-  if (nextBytesRead > MAX_TEXT_PREVIEW_BYTES) {
-    await reader.cancel();
-    throw new Error("Text preview exceeds maximum size");
-  }
-  chunks.push(decoder.decode(result.value, { stream: true }));
-  return readTextStream(reader, decoder, chunks, nextBytesRead);
-};
-
 /** Read a response body as text, aborting past the preview size cap. */
 export const readTextPreview = async (response: Response): Promise<string> => {
   const contentLength = Number(response.headers.get("content-length"));
@@ -44,9 +23,26 @@ export const readTextPreview = async (response: Response): Promise<string> => {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   const chunks: string[] = [];
+  let bytesRead = 0;
+  // Streaming reads are inherently sequential: each read feeds the same
+  // capped accumulator, so parallelizing is impossible.
+  // oxlint-disable eslint/no-await-in-loop -- sequential stream consumption
   try {
-    return await readTextStream(reader, decoder, chunks, 0);
+    while (true) {
+      const result = await reader.read();
+      if (result.done) {
+        chunks.push(decoder.decode());
+        return chunks.join("");
+      }
+      bytesRead += result.value.byteLength;
+      if (bytesRead > MAX_TEXT_PREVIEW_BYTES) {
+        await reader.cancel();
+        throw new Error("Text preview exceeds maximum size");
+      }
+      chunks.push(decoder.decode(result.value, { stream: true }));
+    }
   } finally {
     reader.releaseLock();
   }
+  // oxlint-enable eslint/no-await-in-loop
 };

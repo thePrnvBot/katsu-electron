@@ -1,6 +1,6 @@
 /** Grid overview for jumping between cells. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useAutoHide } from "../hooks/use-auto-hide";
 import { Z_MINIMAP } from "../lib/constants";
@@ -49,6 +49,38 @@ export const Minimap = () => {
   const w = grid.cols * (CELL_SIZE + GAP);
   const h = grid.rows * (CELL_SIZE + GAP);
 
+  // Rebuilt only when the grid or the active cell changes — the 10×10
+  // button grid is otherwise recreated on every render of this component.
+  const cells = useMemo(
+    () =>
+      Array.from({ length: grid.rows }).flatMap((_, row) =>
+        Array.from({ length: grid.cols }).map((_col, col) => {
+          const isCurrent = col === currentCell.x && row === currentCell.y;
+          return (
+            <button
+              type="button"
+              aria-label={`Cell ${col}, ${row}`}
+              key={`${col}-${row}`}
+              onClick={() => moveToCell(col, row)}
+              className="absolute border-none transition-colors"
+              style={{
+                background: isCurrent
+                  ? "rgba(255,255,255,0.5)"
+                  : "rgba(255,255,255,0.08)",
+                borderRadius: 2,
+                cursor: isCurrent ? "default" : "pointer",
+                height: CELL_SIZE,
+                left: col * (CELL_SIZE + GAP),
+                top: row * (CELL_SIZE + GAP),
+                width: CELL_SIZE,
+              }}
+            />
+          );
+        })
+      ),
+    [grid.cols, grid.rows, currentCell.x, currentCell.y, moveToCell]
+  );
+
   return (
     <div className="fixed bottom-0 right-4" style={{ zIndex: Z_MINIMAP }}>
       <AutoHidePill hidden={hidden} onShow={show} position="bottom" />
@@ -63,31 +95,7 @@ export const Minimap = () => {
         style={{ height: h + 16, width: w + 16 }}
       >
         <div className="relative" style={{ height: h, width: w }}>
-          {Array.from({ length: grid.rows }).map((_, row) =>
-            Array.from({ length: grid.cols }).map((_col, col) => {
-              const isCurrent = col === currentCell.x && row === currentCell.y;
-              return (
-                <button
-                  type="button"
-                  aria-label={`Cell ${col}, ${row}`}
-                  key={`${col}-${row}`}
-                  onClick={() => moveToCell(col, row)}
-                  className="absolute border-none transition-colors"
-                  style={{
-                    background: isCurrent
-                      ? "rgba(255,255,255,0.5)"
-                      : "rgba(255,255,255,0.08)",
-                    borderRadius: 2,
-                    cursor: isCurrent ? "default" : "pointer",
-                    height: CELL_SIZE,
-                    left: col * (CELL_SIZE + GAP),
-                    top: row * (CELL_SIZE + GAP),
-                    width: CELL_SIZE,
-                  }}
-                />
-              );
-            })
-          )}
+          {cells}
         </div>
       </div>
     </div>
