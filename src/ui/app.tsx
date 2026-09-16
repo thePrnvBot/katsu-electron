@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import type { PreviewType, Settings } from "../shared/contract";
+import type { Settings } from "../shared/contract";
 import { CameraAnimator } from "./components/camera-animator";
 import { CommandMenu } from "./components/command-menu/command-menu";
 import { Minimap } from "./components/minimap";
@@ -22,9 +22,13 @@ import {
   createFilePreviewFromPath,
 } from "./utils/file-preview";
 import { ignoreFailure } from "./utils/ignore-failure";
-import { centerBoundsInCell, computeWindowSize } from "./utils/layout";
+import {
+  openPreviewWindow,
+  openTerminalWindow,
+} from "./utils/open-preview-window";
 import { scheduleRestoreHydration } from "./utils/window-hydration";
 import {
+  isPersistableWindow,
   windowFromMetadata,
   windowMetadataFromWindow,
 } from "./utils/window-metadata";
@@ -41,26 +45,23 @@ const normalizeUrl = (value: string): string | null => {
   return `https://${value}`;
 };
 
+/** Run an async operation per item, one at a time; count the failures. */
 const processSequentially = async <T,>(
   items: readonly T[],
-  operation: (item: T) => Promise<void>,
-  index = 0
+  operation: (item: T) => Promise<void>
 ): Promise<number> => {
-  if (index >= items.length) {
-    return 0;
-  }
-  const item = items[index];
-  if (item === undefined) {
-    return 0;
-  }
-
   let failed = 0;
-  try {
-    await operation(item);
-  } catch {
-    failed = 1;
+  // Sequential on purpose: each open consumes a one-shot staging grant.
+  // oxlint-disable eslint/no-await-in-loop -- strict per-file ordering
+  for (const item of items) {
+    try {
+      await operation(item);
+    } catch {
+      failed += 1;
+    }
   }
-  return failed + (await processSequentially(items, operation, index + 1));
+  // oxlint-enable eslint/no-await-in-loop
+  return failed;
 };
 
 const isWindowContent = (target: EventTarget | null): boolean =>
@@ -129,11 +130,7 @@ export const App = () => {
   useEffect(() => {
     window.electronAPI.setRequestSaveHandler(() => {
       const currentWindows = Object.values(useWindowStore.getState().windows);
-      // Preview windows reference blob:/katsu:// temp files that are wiped
-      // on relaunch — persisting them would only restore dead windows.
-      const persistable = currentWindows.filter(
-        (w) => w.previewType === undefined
-      );
+      const persistable = currentWindows.filter(isPersistableWindow);
       const metadata = persistable.map(windowMetadataFromWindow);
       void ignoreFailure(window.electronAPI.saveStateResponse(metadata));
     });
@@ -231,7 +228,7 @@ export const App = () => {
   };
 
   const openSite = () => {
-    const cleanUrl = normalizeUrl(urlField);
+    const cleanUrl = normalizeUrl(urlField.trim());
     if (!cleanUrl) {
       return;
     }
@@ -239,58 +236,10 @@ export const App = () => {
     setUrlField("");
   };
 
-  const addPreview = (preview: {
-    fileName: string;
-    previewType: PreviewType;
-    url: string;
-  }) => {
-    const newWindowId = crypto.randomUUID();
-    const { w, h } = computeWindowSize(
-      undefined,
-      undefined,
-      grid.cellWidth,
-      grid.cellHeight
-    );
-    const { x, y } = centerBoundsInCell(w, h, grid, currentCell);
-    addWindow({
-      fileName: preview.fileName,
-      h,
-      id: newWindowId,
-      previewType: preview.previewType,
-      url: preview.url,
-      w,
-      x,
-      y,
-    });
-    activateWindow(newWindowId);
-  };
-
-  const openTerminal = () => {
-    const newWindowId = crypto.randomUUID();
-    const { w, h } = computeWindowSize(
-      undefined,
-      undefined,
-      grid.cellWidth,
-      grid.cellHeight
-    );
-    const { x, y } = centerBoundsInCell(w, h, grid, currentCell);
-    addWindow({
-      fileName: "Terminal",
-      h,
-      id: newWindowId,
-      kind: "terminal",
-      url: "",
-      w,
-      x,
-      y,
-    });
-    activateWindow(newWindowId);
-  };
-
   const handleFileOpen = async (files: File[]) => {
     setStatusMessage(null);
     const failedCount = await processSequentially(files, async (file) => {
-      addPreview(await createFilePreview(file));
+      openPreviewWindow(await createFilePreview(file));
     });
     if (failedCount > 0) {
       setStatusMessage(`${failedCount} file(s) could not be opened.`);
@@ -314,7 +263,7 @@ export const App = () => {
       result.filePaths,
       async (filePath) => {
         const staged = await window.electronAPI.stageFile(filePath);
-        addPreview(createFilePreviewFromPath(staged.name, staged.path));
+        openPreviewWindow(createFilePreviewFromPath(staged.name, staged.path));
       }
     );
     if (failedCount > 0) {
@@ -326,7 +275,7 @@ export const App = () => {
     <div className="fixed inset-0 overflow-hidden">
       <CameraAnimator />
       <TitleBar />
-      <CommandMenu openTerminal={openTerminal} />
+      <CommandMenu openTerminal={openTerminalWindow} />
       <SearchBar
         url={urlField}
         openSite={openSite}

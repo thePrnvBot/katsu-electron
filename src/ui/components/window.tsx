@@ -1,6 +1,14 @@
 /** Window chrome, drag and resize handling, and mounted content tiers. */
 
-import { Maximize, ShieldBan, X } from "lucide-react";
+import {
+  FileText,
+  Globe,
+  Maximize,
+  ShieldBan,
+  Sparkles,
+  Terminal,
+  X,
+} from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import { Rnd } from "react-rnd";
 
@@ -20,10 +28,25 @@ import type { Window as WindowData } from "../store/window-store";
 import { windowCenterCell } from "../utils/layout";
 import { ErrorOverlay } from "./error-overlay";
 import { FilePreview } from "./file-preview";
+import { GenerationView } from "./generation-view";
 import { TerminalView } from "./terminal-view";
 
 const isWebUrl = (url: string) =>
   url.length > 0 && !url.startsWith("katsu://") && !url.startsWith("blob:");
+
+/** Leading icon in the window title bar, keyed to the content type. */
+const WindowKindIcon = ({ win }: { win: WindowData }) => {
+  if (win.kind === "terminal") {
+    return <Terminal size={13} />;
+  }
+  if (win.kind === "generation") {
+    return <Sparkles size={13} />;
+  }
+  if (win.previewType !== undefined) {
+    return <FileText size={13} />;
+  }
+  return <Globe size={13} />;
+};
 
 const absoluteFill: React.CSSProperties = {
   border: "none",
@@ -44,6 +67,24 @@ const suspensionStyle: React.CSSProperties = {
   position: "absolute",
   textAlign: "center",
 };
+
+const windowChromeStyle = (
+  isActive: boolean,
+  z: number
+): React.CSSProperties => ({
+  background: isActive ? "#181818" : "#121212",
+  border: isActive
+    ? "1px solid rgba(255,255,255,0.28)"
+    : "1px solid rgba(255,255,255,0.09)",
+  borderRadius: 12,
+  boxShadow: isActive
+    ? "0 14px 44px rgba(0,0,0,0.6)"
+    : "0 6px 22px rgba(0,0,0,0.4)",
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  zIndex: z,
+});
 
 interface WindowBodyProps {
   isNearCamera: boolean;
@@ -124,6 +165,7 @@ const WebviewContent = ({
 type WindowContentState =
   | { readonly kind: "empty" }
   | { readonly kind: "error"; readonly error: string }
+  | { readonly kind: "generation" }
   | { readonly kind: "preview"; readonly previewType: PreviewType }
   | { readonly kind: "suspended" }
   | { readonly kind: "terminal" }
@@ -143,6 +185,9 @@ const windowContentState = (
   }
   if (win.kind === "terminal") {
     return { kind: "terminal" };
+  }
+  if (win.kind === "generation") {
+    return { kind: "generation" };
   }
   if (loadError !== null) {
     return { error: loadError, kind: "error" };
@@ -182,6 +227,9 @@ const WindowBody = ({
         <div style={suspensionStyle}>Suspended</div>
       )}
       {contentState.kind === "terminal" && <TerminalView windowId={windowId} />}
+      {contentState.kind === "generation" && (
+        <GenerationView windowId={windowId} />
+      )}
       {contentState.kind === "preview" && (
         <FilePreview
           fileName={win.fileName ?? ""}
@@ -273,12 +321,10 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
     if (!(showAdPill && winOrigin)) {
       return;
     }
-    return window.electronAPI.setBlockedCountHandler(windowId, (data) => {
-      if (data.origin === winOrigin) {
-        setBlockedCount(data.count);
-      }
+    return window.electronAPI.setBlockedCountHandler(winOrigin, (data) => {
+      setBlockedCount(data.count);
     });
-  }, [showAdPill, winOrigin, windowId]);
+  }, [showAdPill, winOrigin]);
 
   if (!win) {
     return null;
@@ -327,6 +373,15 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
         bringToFront(win.id);
       }}
       onDragStop={(_, d) => {
+        // DraggableCore fires a stop on every mouseup, including plain
+        // clicks on the titlebar buttons (zero movement). Resetting
+        // `maximized` there would clear the flag while the window keeps its
+        // full-cell size, so the next Maximize click saves the maximized
+        // bounds as prevBounds and the toggle never returns to windowed.
+        // Only a drag that actually moved un-maximizes.
+        if (d.deltaX === 0 && d.deltaY === 0) {
+          return;
+        }
         updateWindow(win.id, { maximized: false, x: d.x, y: d.y });
       }}
       onResizeStart={() => {
@@ -342,33 +397,35 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
           y: pos.y,
         });
       }}
-      style={{
-        background: isActive ? "#1a1a1a" : "#111",
-        border: isActive ? "2px solid rgba(255,255,255,0.4)" : "1px solid #444",
-        borderRadius: 10,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        zIndex: win.z ?? 1,
-      }}
+      style={windowChromeStyle(isActive, win.z ?? 1)}
     >
       {/* Keyboard: Shift+Arrow moves, Alt+Arrow resizes. */}
       <div
-        className={`titlebar flex h-9 items-center justify-between px-2.5 select-none ${
-          isActive ? "bg-[#333]" : "bg-[#2a2a2a]"
-        } text-[#ddd] cursor-grab`}
+        className={`titlebar flex h-9 shrink-0 cursor-grab items-center gap-2 border-b px-2.5 select-none transition-colors ${
+          isActive
+            ? "border-white/10 bg-gradient-to-b from-[#383838] to-[#2c2c2c] text-white/90"
+            : "border-white/5 bg-gradient-to-b from-[#242424] to-[#1d1d1d] text-white/55"
+        }`}
         role="toolbar"
         aria-label="Window controls"
         tabIndex={0}
         onKeyDown={handleTitlebarKeyDown}
       >
-        <span className="w-10 shrink-0 opacity-50">{win.id.slice(0, 4)}</span>
-        <span className="truncate text-center text-sm">{displayName}</span>
-        <div className="flex shrink-0 items-center gap-0.5">
+        <span
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+            isActive ? "bg-white/10 text-white/80" : "bg-white/5 text-white/40"
+          }`}
+        >
+          <WindowKindIcon win={win} />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-center text-[13px] font-medium">
+          {displayName}
+        </span>
+        <div className="flex shrink-0 items-center gap-1">
           {showAdPill && blockedCount > 0 && (
             <div
-              className="mr-1 flex items-center gap-1 rounded-full bg-[#222] px-2 py-0.5 text-[10px] text-white/60"
-              title={`${blockedCount} Ads Blocked`}
+              className="mr-1 flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-white/55"
+              title={`${blockedCount} ads blocked`}
             >
               <ShieldBan size={10} />
               <span>{blockedCount}</span>
@@ -378,7 +435,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
             type="button"
             onClick={() => maximizeWindow(win.id)}
             aria-label="Maximize window"
-            className="flex h-5.5 w-5.5 items-center justify-center rounded-md text-[#aaa] transition hover:scale-105 hover:bg-white/10 hover:text-white"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-white/50 transition hover:bg-white/10 hover:text-white"
           >
             <Maximize size={14} />
           </button>
@@ -386,7 +443,7 @@ export const Window = memo(function Window({ windowId }: { windowId: string }) {
             type="button"
             onClick={() => removeWindow(win.id)}
             aria-label="Close window"
-            className="flex h-5.5 w-5.5 items-center justify-center rounded-md text-[#aaa] transition hover:scale-105 hover:bg-red-500/20 hover:text-red-400"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-white/50 transition hover:bg-red-500/20 hover:text-red-300"
           >
             <X size={14} />
           </button>

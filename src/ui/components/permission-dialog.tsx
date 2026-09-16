@@ -1,5 +1,6 @@
 /** Modal dialog approving or denying camera and microphone requests. */
 
+import { ShieldAlert } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { Z_PERMISSION_DIALOG } from "../lib/constants";
@@ -86,18 +87,28 @@ export const PermissionDialog = () => {
       aria-labelledby="permission-dialog-title"
       onKeyDown={handleKeyDown}
     >
-      <div className="w-96 rounded-2xl border border-white/10 bg-[#222] p-5 shadow-lg backdrop-blur-sm">
-        <h3
-          id="permission-dialog-title"
-          className="text-base font-medium text-white/70"
-        >
-          Permission Request
-        </h3>
-        <p className="mt-2 text-sm text-[#eee]">
-          {request.origin} wants to access {request.permission}.
+      <div className="w-96 rounded-2xl border border-white/10 bg-[#1e1e1e] p-5 shadow-2xl shadow-black/60">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-400/10 text-amber-300">
+            <ShieldAlert size={18} />
+          </span>
+          <div className="min-w-0">
+            <h3
+              id="permission-dialog-title"
+              className="text-sm font-medium text-white/90"
+            >
+              Permission Request
+            </h3>
+            <p className="text-xs text-white/40">A site is requesting access</p>
+          </div>
+        </div>
+        <p className="mt-4 text-sm text-white/80">
+          <span className="text-white/50">{request.origin}</span> wants to
+          access{" "}
+          <span className="font-medium text-white">{request.permission}</span>.
         </p>
         {request.message && (
-          <p className="mt-1 text-sm text-[#eee]">{request.message}</p>
+          <p className="mt-1 text-sm text-white/50">{request.message}</p>
         )}
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -106,7 +117,7 @@ export const PermissionDialog = () => {
             onClick={() => {
               void respond(false);
             }}
-            className="rounded-full bg-[#444] px-4 py-1.5 text-sm text-white/70 transition hover:bg-[#555]"
+            className="rounded-lg border border-white/10 px-4 py-1.5 text-sm text-white/70 transition hover:border-white/20 hover:bg-white/10"
           >
             Deny
           </button>
@@ -116,7 +127,7 @@ export const PermissionDialog = () => {
             onClick={() => {
               void respond(true);
             }}
-            className="rounded-full bg-[#444] px-4 py-1.5 text-sm text-white/70 transition hover:bg-[#555]"
+            className="rounded-lg bg-white px-4 py-1.5 text-sm font-medium text-black transition hover:bg-white/90"
           >
             Allow
           </button>
