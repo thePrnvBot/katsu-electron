@@ -6,23 +6,27 @@ A desktop web browser built with Electron, React, and TypeScript featuring a uni
 
 - **3D Spatial Interface** — Navigate a grid-based virtual world where browser windows exist as movable, resizable objects in 2D space with camera panning and zoom
 - **Built-in Ad Blocking** — Powered by uBlock Origin's static filtering engine for fast, privacy-focused browsing
-- **File Previews** — Open and preview images, videos, audio, text, Markdown, PDFs, and downloads directly in the spatial interface, with Shiki syntax highlighting for code files
-- **Window Layouts** — Snap windows to predefined layouts (half, quarter, centered) within the current grid cell
-- **Custom Protocol** — `katsu://` protocol for internal navigation and file previews
+- **File Previews** — Open and preview images, videos, audio, text, Markdown, PDFs, HTML artifacts, and downloads directly in the spatial interface, with Shiki syntax highlighting for code files
+- **Local Artifact Generation** — Describe a page and a local agent CLI (OpenCode, Claude Code, Codex) builds a self-contained HTML artifact in a throwaway workspace, previewed in-place when done
+- **Built-in Terminal** — Spawn PTY-backed terminal windows (xterm.js with WebGL rendering) that run your system shell
+- **Window Layouts** — Snap windows to predefined layouts (half, third, quarter) within the current grid cell
+- **Custom Protocol** — `katsu://` protocol for internal navigation and file previews, with HTTP range support for media streaming
 - **Window Persistence** — Save and restore your window layout across sessions
 - **Workspaces** — Save the current window setup under a name and reload it from the command menu
-- **Command Menu** — Quick access to actions via keyboard shortcut
+- **Command Menu & Bang Commands** — Quick access to actions via `Cmd/Ctrl+K`, plus `!` shortcuts (`!t` terminal, `!g` generate, `!wl` layout, `!cls` close all) typed straight into the palette
 - **Permission Handling** — Camera and microphone requests are gated behind an in-app approval dialog; all other web permissions are denied by default
+- **Hardened Renderer** — Sandboxed renderer, Electron fuses flipped at build time, and capability-gated file staging
 - **Cross-Platform** — Runs on macOS, Windows, and Linux
 
 ## Tech Stack
 
 - **Frontend**: React 19, TypeScript, Tailwind CSS v4, Zustand, Vite, TanStack Markdown, Shiki
-- **Backend**: Electron 43, Effect (TypeScript ecosystem)
-- **Build**: electron-builder, Ultracite (linting/formatting), Husky (git hooks), Knip (dead code detection)
+- **Backend**: Electron 44, Effect (TypeScript ecosystem), node-pty
+- **Build**: electron-builder (with Electron fuses), Ultracite (linting/formatting), Husky (git hooks), Knip (dead code detection)
 - **Ad Blocking**: @gorhill/ubo-core
 - **Icons**: Lucide React
 - **Command Menu**: cmdk
+- **Terminal**: xterm.js (+ fit and WebGL addons)
 - **Window Management**: react-rnd
 
 ## Installation
@@ -96,39 +100,40 @@ pnpm knip
 ```
 katsu-electron/
 ├── src/
-│   ├── electron/           # Main process code
-│   │   ├── main.ts         # Electron app entry point
-│   │   ├── preload.ts      # Context bridge for IPC
+│   ├── shared/              # Main/renderer contract: IPC types, channels, file tables
+│   ├── electron/            # Main process code
+│   │   ├── main.ts          # Electron app entry point
+│   │   ├── preload.cts      # Context bridge (compiled to CJS for sandboxed preload)
 │   │   ├── window-manager.ts   # Main window lifecycle
-│   │   ├── runtime.ts      # Managed Effect runtime
-│   │   ├── quit-flow.ts    # Save-and-quit coordination
-│   │   ├── util.ts         # Shared utilities
-│   │   ├── ipc/            # IPC handler registration by domain
-│   │   ├── layers/         # Effect dependency layers
-│   │   ├── schemas/        # Effect schema definitions and boundary decode
-│   │   ├── services/       # Backend services
-│   │   ├── session/        # Session setup and listeners
-│   │   ├── shared/         # Shared errors
-│   │   ├── types/          # Additional type declarations
-│   │   └── filters/        # uBlock filter lists
-│   └── ui/                 # Renderer process (React)
-│       ├── app.tsx         # Main app component
-│       ├── main.tsx        # React entry point
-│       ├── index.css       # Global styles
-│       ├── components/     # React components (command-menu/, preview/, ...)
-│       ├── store/          # Zustand state management
-│       ├── hooks/          # Custom React hooks
-│       ├── lib/            # Shared constants
-│       ├── utils/          # Domain utilities
-│       └── types/          # Renderer type declarations
-├── dist-electron/          # Compiled Electron code
-├── dist-react/             # Built React frontend
-├── electron-builder.json   # Build configuration
-├── vite.config.ts          # Vite configuration
-├── vitest.config.ts        # Test runner configuration
-├── oxfmt.config.ts         # Formatter configuration
-├── oxlint.config.ts        # Linter configuration
-├── knip.json               # Unused code detector config
+│   │   ├── runtime.ts       # Managed Effect runtime
+│   │   ├── quit-flow.ts     # Save-and-quit coordination
+│   │   ├── util.ts          # Shared utilities
+│   │   ├── ipc/             # IPC handler registration by domain
+│   │   ├── layers/          # Effect dependency layers
+│   │   ├── schemas/         # Effect schema definitions and boundary decode
+│   │   ├── services/        # Backend services
+│   │   ├── session/         # Session setup and listeners
+│   │   ├── shared/          # Shared errors
+│   │   ├── types/           # Additional type declarations
+│   │   └── filters/         # uBlock filter lists (copied at transpile)
+│   └── ui/                  # Renderer process (React)
+│       ├── app.tsx          # Main app component
+│       ├── main.tsx         # React entry point
+│       ├── index.css        # Global styles
+│       ├── components/      # React components (command-menu/, preview/, ...)
+│       ├── store/           # Zustand state management
+│       ├── hooks/           # Custom React hooks
+│       ├── lib/             # Shared constants
+│       ├── utils/           # Domain utilities
+│       └── types/           # Renderer type declarations
+├── dist-electron/           # Compiled Electron code
+├── dist-react/              # Built React frontend
+├── electron-builder.json    # Build configuration (fuses, asar)
+├── vite.config.ts           # Vite configuration
+├── vitest.config.ts         # Test runner configuration
+├── oxfmt.config.ts          # Formatter configuration
+├── oxlint.config.ts         # Linter configuration
+├── knip.json                # Unused code detector config
 └── package.json
 ```
 
@@ -144,7 +149,7 @@ The main window launches maximized, so grid cells size to the monitor work area 
 
 ### IPC Communication
 
-The renderer communicates with the main process through typed IPC. The unified `katsu:command` envelope is schema-validated and supports:
+The renderer communicates with the main process through typed IPC. Every payload is runtime-validated with Effect Schema at the boundary, and every handler asserts its sender is the app's own main-window frame. The unified `katsu:command` envelope is schema-validated and supports:
 
 ```typescript
 // Router commands:
@@ -153,7 +158,15 @@ The renderer communicates with the main process through typed IPC. The unified `
 // - "permission:respond"  — Grant or deny a permission request
 ```
 
-Dedicated invoke channels cover native dialogs, file staging, PTY terminals, workspace persistence, and the save-state-before-quit handshake.
+Dedicated invoke channels cover native dialogs, capability-gated file staging, PTY terminals, artifact generation, workspace persistence, and the save-state-before-quit handshake.
+
+### Artifact Generation
+
+`generateArtifact` runs a user-selected local agent CLI (OpenCode, Claude Code, Codex) non-interactively inside a throwaway workspace under the OS temp dir. The agent sees a curated environment (no `npm_*` leakage, `PWD`/`INIT_CWD` pinned to the workspace), a wall-clock timeout kills the process tree (including Windows descendants), and the resulting HTML file is staged into the `katsu://` drops dir — the served copy is the only file that survives. Progress lands on the renderer via a buffered, per-generation subscription channel.
+
+### Terminal
+
+Terminal windows spawn a real PTY (`node-pty`) running the platform shell. Output is batched into ~16 ms frames before crossing IPC; input, resize, and kill flow back per session, and sessions are torn down on quit.
 
 ### Ad Blocking
 
@@ -162,6 +175,10 @@ Requests are intercepted via Electron's `webRequest` API and matched against uBl
 ### Session Management
 
 The `session/setup.ts` module configures the Electron session with ad blocking, custom protocol handling, web contents listeners, and a cleaned user agent string.
+
+### Security
+
+The main window runs fully sandboxed with a CommonJS preload (sandboxed preloads cannot be ES modules). Electron fuses are flipped at package time (no `ELECTRON_RUN_AS_NODE`, no inspect flags, ASAR integrity validation, cookie encryption). Staged files are capability-gated: only paths the user picked in the native open dialog can enter the drops dir, the `katsu://` protocol only serves that dir with realpath-based traversal checks, and generated HTML previews run in a locked-down iframe with a network-blocking CSP.
 
 ## Contributing
 

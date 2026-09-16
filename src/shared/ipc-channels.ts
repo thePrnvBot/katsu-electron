@@ -1,6 +1,8 @@
 /**
- * IPC channel names shared between main, preload and renderer.
- * Single source of truth — never inline channel strings.
+ * IPC channel names shared between main and renderer.
+ * Single source of truth — never inline channel strings. The one sanctioned
+ * exception is the sandboxed preload, which cannot require local modules;
+ * its inlined copy is drift-guarded by `src/electron/preload-sync.test.ts`.
  */
 export const IpcChannel = {
   /** Main -> renderer push events. */
