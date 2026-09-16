@@ -7,6 +7,7 @@ import type { IPCCommand } from "../../shared/contract.js";
 import { IpcChannel } from "../../shared/ipc-channels.js";
 import { mainRuntime } from "../runtime.js";
 import { IPCRouter } from "../services/ipc-router.js";
+import { registerArtifactHandlers } from "./artifact-handlers.js";
 import { registerDialogHandlers } from "./dialog-handlers.js";
 import { assertMainWindowSender, unauthorizedResult } from "./guards.js";
 import { registerStateHandlers } from "./state-handlers.js";
@@ -36,6 +37,7 @@ export const registerIpcHandlers = (): void => {
     }
   });
 
+  registerArtifactHandlers();
   registerDialogHandlers();
   registerStateHandlers();
   registerTerminalHandlers();

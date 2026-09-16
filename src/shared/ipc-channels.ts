@@ -5,6 +5,14 @@
 export const IpcChannel = {
   /** Main -> renderer push events. */
   adblockCount: "adblock:count",
+  /** Renderer -> main: cancel a running artifact generation. */
+  artifactCancel: "artifact:cancel",
+  /** Renderer -> main: start a sandboxed artifact generation. */
+  artifactGenerate: "artifact:generate",
+  /** Main -> renderer push: generation progress/output/result. */
+  artifactProgress: "artifact:progress",
+  /** Renderer -> main: list local agent providers and availability. */
+  artifactProviders: "artifact:providers",
   /** Renderer -> main unified command envelope (see contract.ts `IPCCommand`). */
   command: "katsu:command",
   dialogOpenFile: "dialog:openFile",

@@ -2,13 +2,7 @@
 
 import { MAX_TEMP_FILE_BYTES } from "../../shared/contract";
 import type { PreviewType } from "../../shared/contract";
-import {
-  AUDIO_EXTENSIONS,
-  IMAGE_EXTENSIONS,
-  MARKDOWN_EXTENSIONS,
-  VIDEO_EXTENSIONS,
-  TEXT_EXTENSIONS,
-} from "../lib/constants";
+import { PREVIEW_TYPE_BY_EXTENSION } from "../../shared/file-types";
 import { ignoreFailure } from "./ignore-failure";
 
 const TEXT_MIME_PREFIXES = [
@@ -32,7 +26,7 @@ export const getPreviewType = (
   mimeType: string,
   fileName: string
 ): PreviewType => {
-  if (mimeType.startsWith("image/") || mimeType === "image/svg+xml") {
+  if (mimeType.startsWith("image/")) {
     return "image";
   }
   if (mimeType.startsWith("video/")) {
@@ -46,26 +40,14 @@ export const getPreviewType = (
   }
 
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-
-  if (IMAGE_EXTENSIONS.has(ext)) {
-    return "image";
+  const byExtension = PREVIEW_TYPE_BY_EXTENSION.get(ext);
+  if (byExtension !== undefined) {
+    return byExtension;
   }
-  if (VIDEO_EXTENSIONS.has(ext)) {
-    return "video";
-  }
-  if (AUDIO_EXTENSIONS.has(ext)) {
-    return "audio";
-  }
-  if (ext === "pdf") {
-    return "pdf";
-  }
-  if (MARKDOWN_EXTENSIONS.has(ext) || mimeType === "text/markdown") {
+  if (mimeType === "text/markdown") {
     return "markdown";
   }
-  if (
-    TEXT_EXTENSIONS.has(ext) ||
-    TEXT_MIME_PREFIXES.some((p) => mimeType.startsWith(p))
-  ) {
+  if (TEXT_MIME_PREFIXES.some((p) => mimeType.startsWith(p))) {
     return "text";
   }
 

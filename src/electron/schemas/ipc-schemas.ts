@@ -2,7 +2,12 @@
 
 import * as Schema from "effect/Schema";
 
+import {
+  ARTIFACT_PROVIDER_IDS,
+  MAX_ARTIFACT_PROMPT_LENGTH,
+} from "../../shared/contract.js";
 import type {
+  ArtifactProviderId,
   Bounds,
   IPCCommand,
   PermissionRespondCommand,
@@ -42,12 +47,14 @@ const PreviewTypeSchema: Schema.Schema<PreviewType> = Schema.Literal(
   "audio",
   "pdf",
   "markdown",
-  "download"
+  "download",
+  "html"
 );
 
 const WindowKindSchema: Schema.Schema<WindowKind> = Schema.Literal(
   "webview",
-  "terminal"
+  "terminal",
+  "generation"
 );
 
 const WindowMetadataSchema: Schema.Schema<WindowMetadata> = Schema.Struct({
@@ -70,9 +77,28 @@ const WorkspaceEntrySchema = Schema.Struct({
 
 export const WorkspacesSchema = Schema.Array(WorkspaceEntrySchema);
 
-export const SettingsSchema: Schema.Schema<Settings> = Schema.Struct({
+const ArtifactProviderIdSchema: Schema.Schema<ArtifactProviderId> =
+  Schema.Literal(...ARTIFACT_PROVIDER_IDS);
+
+const SettingsSchema: Schema.Schema<Settings> = Schema.Struct({
+  artifactProviderId: ArtifactProviderIdSchema,
   keepWindowsAlive: Schema.Boolean,
   windowPeeking: Schema.Boolean,
+});
+
+/**
+ * Settings as read from disk. Every field is optional so files written
+ * before a field existed stay decodable; persistence merges the decoded
+ * value over `DEFAULT_SETTINGS`.
+ */
+export const SettingsFileSchema = Schema.partial(SettingsSchema);
+
+export const ArtifactStartPayloadSchema = Schema.Struct({
+  prompt: Schema.String.pipe(
+    Schema.minLength(1),
+    Schema.maxLength(MAX_ARTIFACT_PROMPT_LENGTH)
+  ),
+  providerId: ArtifactProviderIdSchema,
 });
 
 // --- Command payloads (single source for envelope + handler decodes) ---
@@ -97,8 +123,12 @@ export const PermissionRespondPayloadSchema: Schema.Schema<
   requestId: Schema.String,
 });
 
+/**
+ * Renderer-dropped file payload. `instanceOf(ArrayBuffer)` rejects anything
+ * that is not a real buffer crossing the IPC bridge.
+ */
 export const TempFileSavePayloadSchema = Schema.Struct({
-  buffer: Schema.Unknown,
+  buffer: Schema.instanceOf(ArrayBuffer),
   name: Schema.String,
 });
 

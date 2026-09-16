@@ -5,6 +5,7 @@ import { app } from "electron";
 
 import { IpcChannel } from "../shared/ipc-channels.js";
 import { mainRuntime } from "./runtime.js";
+import { ArtifactGenerationService } from "./services/artifact-generation.js";
 import { TerminalService } from "./services/terminal.js";
 import { cleanDropsDir } from "./util.js";
 import { getMainWindow } from "./window-manager.js";
@@ -38,6 +39,8 @@ const runQuitCleanup = async (): Promise<void> => {
       Effect.gen(function* cleanup() {
         const terminals = yield* TerminalService;
         yield* terminals.killAll();
+        const artifactGeneration = yield* ArtifactGenerationService;
+        yield* artifactGeneration.killAll();
         yield* cleanDropsDir();
       })
     );

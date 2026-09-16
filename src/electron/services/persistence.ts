@@ -10,7 +10,7 @@ import * as Schema from "effect/Schema";
 import type { Settings, WindowMetadata } from "../../shared/contract.js";
 import { DEFAULT_SETTINGS } from "../../shared/contract.js";
 import {
-  SettingsSchema,
+  SettingsFileSchema,
   WindowsSchema,
   WorkspacesSchema,
 } from "../schemas/ipc-schemas.js";
@@ -149,7 +149,8 @@ export const PersistenceLive = Layer.succeed(Persistence, {
           return JSON.stringify(removeWorkspace(existing, name), null, 2);
         }),
     }),
-  loadSettings: readFileAndDecode(getSettingsFilePath, SettingsSchema).pipe(
+  loadSettings: readFileAndDecode(getSettingsFilePath, SettingsFileSchema).pipe(
+    Effect.map((settings) => ({ ...DEFAULT_SETTINGS, ...settings })),
     Effect.catchAll(() => Effect.succeed(DEFAULT_SETTINGS))
   ),
   loadState: readFileAndDecode(getStateFilePath, WindowsSchema).pipe(

@@ -1,7 +1,21 @@
 /** Converters between window state and persisted metadata. */
 
-import type { WindowMetadata } from "../../shared/contract";
+import type {
+  PreviewType,
+  WindowKind,
+  WindowMetadata,
+} from "../../shared/contract";
 import type { Window as WindowData } from "../store/window-store";
+
+/**
+ * Preview windows point at temp files wiped between runs, and generation
+ * windows are transient (their finished artifact opens in their place) —
+ * persisting either would only restore dead windows.
+ */
+export const isPersistableWindow = (window: {
+  readonly kind?: WindowKind;
+  readonly previewType?: PreviewType;
+}): boolean => window.previewType === undefined && window.kind !== "generation";
 
 export const windowMetadataFromWindow = (
   window: WindowData

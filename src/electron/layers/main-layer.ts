@@ -3,6 +3,7 @@
 import * as Layer from "effect/Layer";
 
 import { AdBlockerLive } from "../services/ad-blocker.js";
+import { ArtifactGenerationServiceLive } from "../services/artifact-generation.js";
 import { FileStagingLive } from "../services/file-staging.js";
 import { IPCRouterLive } from "../services/ipc-router.js";
 import { PermissionsLive } from "../services/permissions.js";
@@ -12,6 +13,7 @@ import { TerminalServiceLive } from "../services/terminal.js";
 
 export const MainLayer = Layer.mergeAll(
   AdBlockerLive,
+  ArtifactGenerationServiceLive,
   FileStagingLive,
   IPCRouterLive,
   PermissionsLive,

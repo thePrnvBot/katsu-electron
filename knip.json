@@ -5,7 +5,7 @@
     "src/electron/preload.ts",
     "src/ui/types/electron.d.ts"
   ],
-  "ignoreBinaries": ["cloc"],
+  "ignoreBinaries": ["cloc", "taskkill"],
   "project": ["src/**/*.{ts,tsx}", "*.ts"],
   "ignoreDependencies": [
     "clsx",

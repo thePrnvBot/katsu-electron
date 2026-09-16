@@ -4,18 +4,19 @@ import { Command } from "cmdk";
 
 import { useWindowStore } from "../../store/window-store";
 import type { WindowLayout } from "../../utils/window-layouts";
+import { WINDOW_LAYOUT_LABELS } from "../../utils/window-layouts";
 import type { CloseProps } from "./command-menu";
 
-const LAYOUTS: { readonly key: WindowLayout; readonly label: string }[] = [
-  { key: "left_half", label: "Left Half" },
-  { key: "right_half", label: "Right Half" },
-  { key: "left_third", label: "Left One Third" },
-  { key: "center_third", label: "Center One Third" },
-  { key: "right_third", label: "Right One Third" },
-  { key: "top_left_quarter", label: "Top Left Quarter" },
-  { key: "top_right_quarter", label: "Top Right Quarter" },
-  { key: "bottom_left_quarter", label: "Bottom Left Quarter" },
-  { key: "bottom_right_quarter", label: "Bottom Right Quarter" },
+const LAYOUTS: readonly WindowLayout[] = [
+  "left_half",
+  "right_half",
+  "left_third",
+  "center_third",
+  "right_third",
+  "top_left_quarter",
+  "top_right_quarter",
+  "bottom_left_quarter",
+  "bottom_right_quarter",
 ];
 
 export const LayoutMenu = ({ closeAndResetMenu }: CloseProps) => {
@@ -33,13 +34,13 @@ export const LayoutMenu = ({ closeAndResetMenu }: CloseProps) => {
 
   return (
     <>
-      {LAYOUTS.map(({ key, label }) => (
+      {LAYOUTS.map((layout) => (
         <Command.Item
-          key={key}
-          onSelect={() => applyWindowLayout(key)}
+          key={layout}
+          onSelect={() => applyWindowLayout(layout)}
           className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
         >
-          {label}
+          {WINDOW_LAYOUT_LABELS[layout]}
         </Command.Item>
       ))}
     </>

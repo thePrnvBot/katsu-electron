@@ -17,6 +17,11 @@ describe("getPreviewType", () => {
     expect(getPreviewType("", "doc.pdf")).toBe("pdf");
   });
 
+  it("classifies HTML by extension", () => {
+    expect(getPreviewType("text/html", "index.html")).toBe("html");
+    expect(getPreviewType("", "page.htm")).toBe("html");
+  });
+
   it("classifies plain text and unknown files", () => {
     expect(getPreviewType("text/plain", "notes.txt")).toBe("text");
     expect(getPreviewType("", "archive.zip")).toBe("download");

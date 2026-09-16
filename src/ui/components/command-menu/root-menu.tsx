@@ -2,8 +2,8 @@
 
 import { Command } from "cmdk";
 
+import type { CommandPages } from "../../store/command-menu-store";
 import { useWindowStore } from "../../store/window-store";
-import type { CommandPages } from "./command-menu";
 
 interface RootMenuProps {
   navigateToPage: (page: CommandPages) => void;
@@ -56,6 +56,12 @@ export const RootMenu = ({
         className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
       >
         Workspaces
+      </Command.Item>
+      <Command.Item
+        onSelect={() => navigateToPage("generate")}
+        className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm text-[#eee] outline-none data-[selected=true]:bg-[#333]"
+      >
+        Generate Artifact
       </Command.Item>
       <Command.Item
         onSelect={() => handleOpenTerminal()}

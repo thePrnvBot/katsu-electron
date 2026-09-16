@@ -3,6 +3,7 @@
 import type { PreviewType } from "../../shared/contract";
 import { AudioPreview } from "./preview/audio-preview";
 import { DownloadPreview } from "./preview/download-preview";
+import { HtmlPreview } from "./preview/html-preview";
 import { ImagePreview } from "./preview/image-preview";
 import { MarkdownPreview } from "./preview/markdown-preview";
 import { TextPreview } from "./preview/text-preview";
@@ -36,6 +37,9 @@ export const FilePreview = ({
     }
     case "markdown": {
       return <MarkdownPreview fileName={fileName} url={url} />;
+    }
+    case "html": {
+      return <HtmlPreview fileName={fileName} url={url} />;
     }
     case "download": {
       return <DownloadPreview fileName={fileName} />;

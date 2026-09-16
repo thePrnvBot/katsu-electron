@@ -30,6 +30,13 @@ export const getWorkspacesFilePath = (): string =>
 export const getDropsDir = (): string =>
   path.join(app.getPath("temp"), "katsu-drops");
 
+/**
+ * Root for throwaway per-generation working directories. Separate from the
+ * drops dir so artifact staging never collides with preview cleanup.
+ */
+export const getArtifactWorkspacesDir = (): string =>
+  path.join(app.getPath("temp"), "katsu-artifacts");
+
 const TEMP_NAME_ALLOWLIST = /[^A-Za-z0-9._-]/gu;
 
 /** Strip directory components and hostile characters from a drop filename. */
@@ -58,6 +65,17 @@ export const cleanDropsDir = (): Effect.Effect<void> =>
       const dir = getDropsDir();
       await fs.rm(dir, { force: true, recursive: true });
       await fs.mkdir(dir, { recursive: true });
+    },
+  }).pipe(Effect.ignore);
+
+/** Wipe interrupted generation workspaces from a previous run. */
+export const cleanArtifactWorkspaces = (): Effect.Effect<void> =>
+  Effect.tryPromise({
+    catch: () => new Error("failed to clean artifact workspaces"),
+    try: async () => {
+      const directoryPath = getArtifactWorkspacesDir();
+      await fs.rm(directoryPath, { force: true, recursive: true });
+      await fs.mkdir(directoryPath, { recursive: true });
     },
   }).pipe(Effect.ignore);
 

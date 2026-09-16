@@ -28,6 +28,21 @@ body {
   color: var(--fg);
 }
 
+@keyframes word-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-word-fade {
+  animation: word-fade 0.45s ease-out;
+}
+
 .app-region-drag {
   -webkit-app-region: drag;
 }
