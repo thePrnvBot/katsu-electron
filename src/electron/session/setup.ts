@@ -242,6 +242,15 @@ const isAllowedMainWindowUrl = (url: string): boolean => {
   }
 };
 
+const isAllowedWebviewUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 export const setupWebContentsListeners = (): void => {
   app.on("web-contents-created", (_event, contents) => {
     // No new native windows from any guest — open real links externally.
@@ -267,13 +276,27 @@ export const setupWebContentsListeners = (): void => {
         delete webPreferences.preload;
       });
 
-      // The main window may only ever show the app itself.
-      contents.on("will-navigate", (navEvent, url) => {
-        if (!isAllowedMainWindowUrl(url)) {
-          navEvent.preventDefault();
-        }
-      });
     }
+
+    // The main window may only show the app; webviews may only show web URLs.
+    contents.on("will-navigate", (navEvent, url) => {
+      const allowed =
+        contents.getType() === "window"
+          ? isAllowedMainWindowUrl(url)
+          : isAllowedWebviewUrl(url);
+      if (!allowed) {
+        navEvent.preventDefault();
+      }
+    });
+    contents.on("will-redirect", (redirectEvent, url) => {
+      const allowed =
+        contents.getType() === "window"
+          ? isAllowedMainWindowUrl(url)
+          : isAllowedWebviewUrl(url);
+      if (!allowed) {
+        redirectEvent.preventDefault();
+      }
+    });
 
     contents.on("did-navigate", (_navEvent, url) => {
       const origin = originFromUrl(url);

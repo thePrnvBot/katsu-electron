@@ -10,6 +10,7 @@ import {
   DEFAULT_WINDOW_Y,
 } from "../lib/constants";
 import { revokePreviewUrl } from "../utils/file-preview";
+import { cancelStaggered } from "../utils/staggered";
 import type { WindowLayout } from "../utils/window-layouts";
 import { resolveLayout } from "../utils/window-layouts";
 import { useCameraStore } from "./camera-store";
@@ -82,6 +83,7 @@ export const useWindowStore = create<WindowState>((set) => ({
     }),
   closeAllWindows: () =>
     set((s) => {
+      cancelStaggered();
       for (const w of Object.values(s.windows)) {
         revokePreviewUrl(w.url);
       }
@@ -163,6 +165,7 @@ export const useWindowStore = create<WindowState>((set) => ({
     }),
   replaceWindows: (windows) =>
     set((s) => {
+      cancelStaggered();
       for (const w of Object.values(s.windows)) {
         revokePreviewUrl(w.url);
       }

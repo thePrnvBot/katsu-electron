@@ -126,6 +126,7 @@ const terminalDataBacklog = new Map<
 >();
 const MAX_BUFFERED_TERMINAL_EVENTS = 256;
 const MAX_BUFFERED_TERMINAL_BYTES = 256 * 1024;
+const MAX_BUFFERED_TERMINAL_SESSIONS = 128;
 ipcRenderer.on(IpcChannel.terminalData, (_event, data: TerminalDataPayload) => {
   const handler = terminalDataSubscribers.get(data.id);
   if (handler) {
@@ -133,14 +134,23 @@ ipcRenderer.on(IpcChannel.terminalData, (_event, data: TerminalDataPayload) => {
     return;
   }
 
-  const backlog = terminalDataBacklog.get(data.id) ?? { bytes: 0, events: [] };
+  let backlog = terminalDataBacklog.get(data.id);
+  if (!backlog) {
+    if (terminalDataBacklog.size >= MAX_BUFFERED_TERMINAL_SESSIONS) {
+      const [oldestId] = terminalDataBacklog.keys();
+      if (oldestId) {
+        terminalDataBacklog.delete(oldestId);
+      }
+    }
+    backlog = { bytes: 0, events: [] };
+    terminalDataBacklog.set(data.id, backlog);
+  }
   if (
     backlog.events.length < MAX_BUFFERED_TERMINAL_EVENTS &&
     backlog.bytes + data.data.length <= MAX_BUFFERED_TERMINAL_BYTES
   ) {
     backlog.events.push(data);
     backlog.bytes += data.data.length;
-    terminalDataBacklog.set(data.id, backlog);
   }
 });
 
@@ -150,10 +160,20 @@ const terminalExitSubscribers = new Map<
 >();
 const terminalExitBacklog = new Map<string, TerminalExitPayload>();
 ipcRenderer.on(IpcChannel.terminalExit, (_event, data: TerminalExitPayload) => {
+  terminalDataBacklog.delete(data.id);
   const handler = terminalExitSubscribers.get(data.id);
   if (handler) {
     handler(data);
     return;
+  }
+  if (
+    !terminalExitBacklog.has(data.id) &&
+    terminalExitBacklog.size >= MAX_BUFFERED_TERMINAL_SESSIONS
+  ) {
+    const [oldestId] = terminalExitBacklog.keys();
+    if (oldestId) {
+      terminalExitBacklog.delete(oldestId);
+    }
   }
   terminalExitBacklog.set(data.id, data);
 });

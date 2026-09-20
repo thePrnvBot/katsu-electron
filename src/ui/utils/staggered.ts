@@ -1,13 +1,14 @@
 /** Staggered timers with cancellation, shared by restore and workspace hydration. */
 
 /** Timers of an in-flight staggered pass so a new pass can cancel them. */
-const pendingTimers: number[] = [];
+const pendingTimers = new Set<number>();
 
 /** Cancel any in-flight staggered pass. */
 export const cancelStaggered = (): void => {
-  for (const timer of pendingTimers.splice(0)) {
+  for (const timer of pendingTimers) {
     window.clearTimeout(timer);
   }
+  pendingTimers.clear();
 };
 
 /**
@@ -22,10 +23,10 @@ export const scheduleStaggered = <T>(
 ): void => {
   cancelStaggered();
   for (const [index, entry] of entries.entries()) {
-    pendingTimers.push(
-      window.setTimeout(() => {
-        apply(entry);
-      }, index * delayMs)
-    );
+    const timer = window.setTimeout(() => {
+      pendingTimers.delete(timer);
+      apply(entry);
+    }, index * delayMs);
+    pendingTimers.add(timer);
   }
 };

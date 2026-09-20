@@ -24,6 +24,7 @@ export const ProtocolHandler =
   Context.GenericTag<ProtocolHandler>("ProtocolHandler");
 
 interface ValidatedFile {
+  readonly file: fs.FileHandle;
   readonly resolved: string;
   readonly size: number;
 }
@@ -90,7 +91,36 @@ const validateFilePath = (
       });
     }
 
-    return { resolved, size: stat.size };
+    const file = yield* Effect.tryPromise({
+      catch: (cause) =>
+        new ProtocolError({ cause, path: resolved, reason: "FileNotFound" }),
+      try: () => fs.open(resolved, "r"),
+    });
+    const openedStat = yield* Effect.tryPromise({
+      catch: (cause) =>
+        new ProtocolError({ cause, path: resolved, reason: "FileNotFound" }),
+      try: async () => {
+        try {
+          return await file.stat();
+        } catch (error) {
+          await file.close();
+          throw error;
+        }
+      },
+    });
+    if (!openedStat.isFile()) {
+      yield* Effect.tryPromise({
+        catch: () => new ProtocolError({ path: resolved, reason: "FileNotFound" }),
+        try: () => file.close(),
+      });
+      return yield* new ProtocolError({
+        path: resolved,
+        reason: "InvalidPath",
+      });
+    }
+
+    // The stream owns this descriptor and closes it when consumed/cancelled.
+    return { file, resolved, size: openedStat.size };
   });
 
 /**
@@ -144,20 +174,27 @@ export const ProtocolHandlerLive = Layer.succeed(ProtocolHandler, {
         catch: () => new ProtocolError({ reason: "InvalidPath" }),
         try: () => decodeURIComponent(url.pathname.slice(1)),
       });
-      const { resolved, size } = yield* validateFilePath(filePath);
+      const { file, resolved, size } = yield* validateFilePath(filePath);
       const mimeType = getMimeType(resolved);
 
       const rangeHeader = request.headers.get("range");
       if (rangeHeader) {
         const range = parseRangeHeader(rangeHeader, size);
         if (!range) {
+          yield* Effect.tryPromise({
+            catch: () =>
+              new ProtocolError({ path: resolved, reason: "FileNotFound" }),
+            try: () => file.close(),
+          });
           return new Response(null, {
             headers: { "Content-Range": `bytes */${size}` },
             status: 416,
           });
         }
-        const stream = createReadStream(resolved, {
+        const stream = createReadStream(null, {
+          autoClose: true,
           end: range.end,
+          fd: file.fd,
           start: range.start,
         });
         const headers = baseHeaders(mimeType);
@@ -172,7 +209,7 @@ export const ProtocolHandlerLive = Layer.succeed(ProtocolHandler, {
         });
       }
 
-      const stream = createReadStream(resolved);
+      const stream = createReadStream(null, { autoClose: true, fd: file.fd });
       const headers = baseHeaders(mimeType);
       headers.set("Content-Length", String(size));
       return new Response(webStream(stream), {
